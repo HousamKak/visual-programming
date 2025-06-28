@@ -1,22 +1,105 @@
 {
   "name": "visual-programming-framework",
-  "version": "1.0.0",
-  "description": "A modular visual programming mini-framework with card/icon views",
+  "version": "2.0.0",
+  "description": "An  modular visual programming framework with assignment operations and inline editing",
   "type": "module",
+  "main": "src/main.ts",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "serve": "vite --host 0.0.0.0 --port 3000"
+    "serve": "vite --host 0.0.0.0 --port 3000",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext .ts,.js",
+    "test": "vitest",
+    "docs": "typedoc src/main.ts"
+  },
+  "keywords": [
+    "visual-programming",
+    "block-programming", 
+    "drag-and-drop",
+    "typescript",
+    "assignment-operations",
+    "inline-editing",
+    "educational",
+    "code-blocks"
+  ],
+  "author": "Visual Programming Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
   },
   "devDependencies": {
     "vite": "^5.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "eslint": "^8.50.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "vitest": "^1.0.0",
+    "typedoc": "^0.25.0"
   },
   "dependencies": {
     "lodash-es": "^4.17.21"
   },
-  "engines": {
-    "node": ">=18.0.0"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/enhanced-visual-programming-framework.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/enhanced-visual-programming-framework/issues"
+  },
+  "homepage": "https://github.com/your-org/enhanced-visual-programming-framework#readme",
+  "files": [
+    "src/**/*",
+    "dist/**/*",
+    "README.md",
+    "LICENSE",
+    "index.html",
+    "vite.config.ts",
+    "tsconfig.json"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/enhanced-main.js",
+      "types": "./dist/enhanced-main.d.ts"
+    },
+    "./core/*": {
+      "import": "./dist/core/*.js",
+      "types": "./dist/core/*.d.ts"
+    },
+    "./ui/*": {
+      "import": "./dist/ui/*.js", 
+      "types": "./dist/ui/*.d.ts"
+    }
+  },
+  "browserslist": [
+    "defaults",
+    "not IE 11",
+    "not op_mini all"
+  ],
+  "volta": {
+    "node": "18.18.0",
+    "npm": "9.8.1"
+  },
+  "features": {
+    "assignment-operations": "2.0.0",
+    "inline-editing": "2.0.0", 
+    "enhanced-blocks": "2.0.0",
+    "array-manipulation": "2.0.0",
+    "object-properties": "2.0.0",
+    "math-assignments": "2.0.0",
+    "enhanced-loops": "2.0.0",
+    "context-menus": "2.0.0",
+    "property-editing": "2.0.0",
+    "keyboard-shortcuts": "2.0.0",
+    "quick-add": "2.0.0"
+  },
+  "config": {
+    "maxElements": 1000,
+    "maxConnections": 2000,
+    "defaultGridSize": 16,
+    "autoSaveInterval": 30000,
+    "undoStackSize": 50
   }
 }

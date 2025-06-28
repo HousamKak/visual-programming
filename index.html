@@ -3,11 +3,105 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visual Programming Framework</title>
+    <title>Enhanced Visual Programming Framework</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/src/themes/card.css">
+    <style>
+        /* Enhanced styles for new features */
+        .inline-element-editor {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .inline-element-editor input,
+        .inline-element-editor textarea,
+        .inline-element-editor select {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .element-context-menu {
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+        }
+        
+        .help-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            z-index: 3000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .help-content {
+            background: var(--bg-card, rgba(15, 15, 25, 0.95));
+            border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.1));
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            color: var(--text-primary, #ffffff);
+        }
+        
+        .help-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--primary-blue, #00d4ff);
+        }
+        
+        .help-section {
+            margin-bottom: 16px;
+        }
+        
+        .help-section h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--accent-green, #10b981);
+        }
+        
+        .help-shortcuts {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 8px;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .help-shortcut-key {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        
+        .new-block-highlight {
+            position: relative;
+            overflow: visible;
+        }
+        
+        .new-block-highlight::after {
+            content: "NEW";
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: var(--accent-orange, #f59e0b);
+            color: #000;
+            font-size: 9px;
+            font-weight: 700;
+            padding: 2px 4px;
+            border-radius: 4px;
+            z-index: 10;
+        }
+    </style>
 </head>
 <body>
     <div class="canvas-container">
@@ -20,47 +114,62 @@
         <div class="tool-group">
             <div class="tool-group-title">Data Types</div>
             <div class="tools">
-                <button class="tool" data-type="variable">Variable</button>
-                <button class="tool" data-type="array">Array</button>
-                <button class="tool" data-type="counter">Counter</button>
-                <button class="tool" data-type="object">Object</button>
-                <button class="tool" data-type="string_concat">Concat</button>
-                <button class="tool" data-type="comment">Comment</button>
+                <button class="tool" data-type="variable">📊 Variable</button>
+                <button class="tool new-block-highlight" data-type="set_variable" title="Assign value to variable">📝 Set Variable</button>
+                <button class="tool new-block-highlight" data-type="get_variable" title="Get variable value">📖 Get Variable</button>
+                <button class="tool" data-type="array">📋 Array</button>
+                <button class="tool new-block-highlight" data-type="array_push" title="Add item to array">➕ Array Push</button>
+                <button class="tool new-block-highlight" data-type="array_pop" title="Remove last item">➖ Array Pop</button>
+                <button class="tool new-block-highlight" data-type="array_get" title="Get array item by index">🔍 Array Get</button>
+                <button class="tool new-block-highlight" data-type="array_set" title="Set array item by index">✏️ Array Set</button>
+                <button class="tool" data-type="counter">🔢 Counter</button>
+                <button class="tool new-block-highlight" data-type="counter_increment" title="Increment counter">⬆️ Increment</button>
+                <button class="tool new-block-highlight" data-type="counter_reset" title="Reset counter">🔄 Reset Counter</button>
+                <button class="tool" data-type="object">📦 Object</button>
+                <button class="tool new-block-highlight" data-type="object_get" title="Get object property">🔍 Object Get</button>
+                <button class="tool new-block-highlight" data-type="object_set" title="Set object property">✏️ Object Set</button>
+                <button class="tool new-block-highlight" data-type="string_concat" title="Concatenate strings">🔗 Concat</button>
+                <button class="tool" data-type="comment">💬 Comment</button>
             </div>
         </div>
         
         <div class="tool-group">
             <div class="tool-group-title">Control Flow</div>
             <div class="tools">
-                <button class="tool" data-type="if">If</button>
-                <button class="tool" data-type="loop">Loop</button>
-                <button class="tool" data-type="function">Function</button>
-                <button class="tool" data-type="return">Return</button>
-                <button class="tool" data-type="delay">Delay</button>
+                <button class="tool" data-type="if">❓ If</button>
+                <button class="tool new-block-highlight" data-type="if_assign" title="Conditional assignment">❓➡️ If Assign</button>
+                <button class="tool" data-type="loop">🔄 Loop</button>
+                <button class="tool new-block-highlight" data-type="while_loop" title="Loop while condition is true">🔁 While Loop</button>
+                <button class="tool new-block-highlight" data-type="for_range" title="Loop from start to end">🔢 For Range</button>
+                <button class="tool" data-type="function">⚙️ Function</button>
+                <button class="tool" data-type="return">🏁 Return</button>
+                <button class="tool" data-type="delay">⏰ Delay</button>
             </div>
         </div>
 
         <div class="tool-group">
             <div class="tool-group-title">Math & Logic</div>
             <div class="tools">
-                <button class="tool" data-type="add">Add</button>
-                <button class="tool" data-type="subtract">Subtract</button>
-                <button class="tool" data-type="multiply">Multiply</button>
-                <button class="tool" data-type="divide">Divide</button>
-                <button class="tool" data-type="modulo">Modulo</button>
-                <button class="tool" data-type="compare">Compare</button>
-                <button class="tool" data-type="and">AND</button>
-                <button class="tool" data-type="or">OR</button>
-                <button class="tool" data-type="not">NOT</button>
-                <button class="tool" data-type="random">Random</button>
+                <button class="tool" data-type="add">➕ Add</button>
+                <button class="tool new-block-highlight" data-type="add_assign" title="Add and assign (+=)">➕= Add Assign</button>
+                <button class="tool" data-type="subtract">➖ Subtract</button>
+                <button class="tool" data-type="multiply">✖️ Multiply</button>
+                <button class="tool new-block-highlight" data-type="multiply_assign" title="Multiply and assign (*=)">✖️= Multiply Assign</button>
+                <button class="tool" data-type="divide">➗ Divide</button>
+                <button class="tool" data-type="modulo">% Modulo</button>
+                <button class="tool" data-type="compare">⚖️ Compare</button>
+                <button class="tool" data-type="and">🔗 AND</button>
+                <button class="tool" data-type="or">🔀 OR</button>
+                <button class="tool" data-type="not">🚫 NOT</button>
+                <button class="tool" data-type="random">🎲 Random</button>
             </div>
         </div>
 
         <div class="tool-group">
             <div class="tool-group-title">I/O</div>
             <div class="tools">
-                <button class="tool" data-type="print">Print</button>
-                <button class="tool" data-type="prompt">Input</button>
+                <button class="tool" data-type="print">🖨️ Print</button>
+                <button class="tool" data-type="prompt">💬 Input</button>
             </div>
         </div>
         
@@ -71,6 +180,7 @@
                 <button class="tool" id="toggleView">🎛 View</button>
                 <button class="tool" id="clearAll">🗑 Clear</button>
                 <button class="tool" id="togglePanel">📋 Panel</button>
+                <button class="tool" id="showHelp">❓ Help</button>
             </div>
         </div>
     </div>
@@ -82,11 +192,21 @@
         <button class="load-button" id="loadCode">📁 Load</button>
         
         <div class="info-section">
-            <div class="info-title">Visual Programming</div>
+            <div class="info-title">Enhanced Visual Programming</div>
             <div class="info-text">
-                Drag elements from the toolbar to create your program flow.
-                Use Connect mode to link elements together.
-                Toggle between card and icon views for different levels of detail.
+                <strong>New Features:</strong><br>
+                • Double-click elements to edit values<br>
+                • Right-click for context menu<br>
+                • Assignment operations for variables<br>
+                • Array manipulation blocks<br>
+                • Enhanced loops and conditions<br>
+                • Math assignment operators<br>
+                <br>
+                <strong>Quick Add (Alt+Key):</strong><br>
+                Alt+V: Variable | Alt+S: Set Variable<br>
+                Alt+A: Array | Alt+F: Function<br>
+                Alt+L: Loop | Alt+C: Counter<br>
+                Alt+P: Print | Alt+G: Get Variable
             </div>
         </div>
         
@@ -102,8 +222,120 @@
         </div>
     </div>
 
-    <div class="status" id="status">Ready to program</div>
+    <div class="status" id="status">Enhanced framework ready</div>
 
-    <script type="module" src="/src/main.ts"></script>
+    <!-- Help Overlay -->
+    <div class="help-overlay" id="helpOverlay">
+        <div class="help-content">
+            <div class="help-title">Enhanced Visual Programming Framework - Help</div>
+            
+            <div class="help-section">
+                <h3>🎯 New Assignment Features</h3>
+                <p>This enhanced framework includes powerful assignment and data manipulation blocks:</p>
+                <ul>
+                    <li><strong>Set/Get Variable:</strong> Store and retrieve values by name</li>
+                    <li><strong>Array Operations:</strong> Push, pop, get/set by index</li>
+                    <li><strong>Object Properties:</strong> Get/set object properties</li>
+                    <li><strong>Math Assignment:</strong> += and *= operators</li>
+                    <li><strong>Enhanced Loops:</strong> While loops and for-range loops</li>
+                </ul>
+            </div>
+
+            <div class="help-section">
+                <h3>⌨️ Keyboard Shortcuts</h3>
+                <div class="help-shortcuts">
+                    <span class="help-shortcut-key">Ctrl+S</span><span>Save program</span>
+                    <span class="help-shortcut-key">Ctrl+O</span><span>Load program</span>
+                    <span class="help-shortcut-key">Ctrl+Enter</span><span>Execute program</span>
+                    <span class="help-shortcut-key">Ctrl+Z</span><span>Undo</span>
+                    <span class="help-shortcut-key">Ctrl+Y</span><span>Redo</span>
+                    <span class="help-shortcut-key">Ctrl+D</span><span>Duplicate selected</span>
+                    <span class="help-shortcut-key">Delete</span><span>Delete selected</span>
+                    <span class="help-shortcut-key">Double-click</span><span>Edit element</span>
+                    <span class="help-shortcut-key">Right-click</span><span>Context menu</span>
+                </div>
+            </div>
+
+            <div class="help-section">
+                <h3>🚀 Quick Add Shortcuts</h3>
+                <div class="help-shortcuts">
+                    <span class="help-shortcut-key">Alt+V</span><span>Add Variable</span>
+                    <span class="help-shortcut-key">Alt+S</span><span>Add Set Variable</span>
+                    <span class="help-shortcut-key">Alt+G</span><span>Add Get Variable</span>
+                    <span class="help-shortcut-key">Alt+A</span><span>Add Array</span>
+                    <span class="help-shortcut-key">Alt+F</span><span>Add Function</span>
+                    <span class="help-shortcut-key">Alt+L</span><span>Add Loop</span>
+                    <span class="help-shortcut-key">Alt+C</span><span>Add Counter</span>
+                    <span class="help-shortcut-key">Alt+P</span><span>Add Print</span>
+                </div>
+            </div>
+
+            <div class="help-section">
+                <h3>🎨 Usage Tips</h3>
+                <ul>
+                    <li>Use <strong>Set Variable</strong> to store values that other blocks can access</li>
+                    <li>Connect arrays to <strong>Array Push/Pop</strong> to modify them</li>
+                    <li>Use <strong>For Range</strong> loops for counted iterations</li>
+                    <li>Double-click any element to edit its properties inline</li>
+                    <li>Right-click elements for duplicate/delete options</li>
+                    <li>Toggle between card and icon views for different detail levels</li>
+                </ul>
+            </div>
+
+            <button onclick="document.getElementById('helpOverlay').style.display='none'" 
+                    style="background: var(--accent-green); color: #000; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; margin-top: 16px;">
+                Got it!
+            </button>
+        </div>
+    </div>
+
+    <script type="module">
+        // Enhanced main application
+        import('./src/enhanced-main.js').catch(() => {
+            // Fallback to regular main if enhanced version not available
+            import('./src/main.js');
+        });
+
+        // Show help overlay
+        document.getElementById('showHelp')?.addEventListener('click', () => {
+            document.getElementById('helpOverlay').style.display = 'flex';
+        });
+
+        // Close help overlay when clicking outside
+        document.getElementById('helpOverlay')?.addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                e.target.style.display = 'none';
+            }
+        });
+
+        // Enhanced status messages
+        const statusEl = document.getElementById('status');
+        if (statusEl) {
+            statusEl.textContent = 'Enhanced Visual Programming Framework - Double-click elements to edit!';
+        }
+
+        // Add enhanced visual feedback
+        document.addEventListener('DOMContentLoaded', () => {
+            // Add glow effect to new block types
+            const newBlocks = document.querySelectorAll('.new-block-highlight');
+            newBlocks.forEach(block => {
+                block.addEventListener('mouseenter', () => {
+                    block.style.filter = 'drop-shadow(0 0 8px var(--accent-orange))';
+                });
+                block.addEventListener('mouseleave', () => {
+                    block.style.filter = '';
+                });
+            });
+
+            // Show welcome notification
+            setTimeout(() => {
+                const status = document.getElementById('status');
+                if (status) {
+                    status.textContent = 'Try Alt+V to quickly add a variable! Press ? for help.';
+                    status.className = 'status success';
+                }
+            }, 2000);
+        });
+    </script>
 </body>
 </html>
