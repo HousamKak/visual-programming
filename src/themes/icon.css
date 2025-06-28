@@ -26,56 +26,68 @@ body.icon-view {
 .icon-view .element-label {
     font-size: 8px;
     margin-bottom: 1px;
-    opacity: 0.8;
-    display: none;
+    opacity: 0.9;
+    display: block; /* Show labels in icon view */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .icon-view .element-content {
-    font-size: 9px;
-    max-height: 20px;
+    font-size: 8px;
+    max-height: 16px;
     line-height: 1;
-    display: none;
+    display: block; /* Show content in icon view */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .icon-view .element-value {
-    font-size: 10px;
-    display: none;
+    font-size: 7px;
+    display: block; /* Show values in icon view */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-/* Hide detailed content in icon view */
+/* Show simplified content in icon view */
 .icon-view .array-container {
     transform: scale(0.7);
+    display: flex;
 }
 
 .icon-view .array-item {
-    width: 8px;
-    height: 8px;
-    font-size: 6px;
+    width: 6px;
+    height: 6px;
+    font-size: 5px;
+    min-width: 6px;
 }
 
 .icon-view .array-bracket {
-    font-size: 10px;
+    font-size: 8px;
 }
 
 /* Connection points scaling */
 .icon-view .connection-point {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
 }
 
 .icon-view .input-point {
-    left: -4px;
+    left: -3px;
 }
 
 .icon-view .output-point {
-    right: -4px;
+    right: -3px;
 }
 
 /* Reduce loop animation size */
 .icon-view .element.loop::after {
-    width: 8px;
-    height: 8px;
-    right: 4px;
+    width: 6px;
+    height: 6px;
+    right: 2px;
+    border-width: 1px;
 }
 
 /* Toolbar adjustments for icon view */
@@ -149,4 +161,27 @@ body.icon-view {
 
 .icon-view .element.object .element-content {
     text-align: center;
+}
+
+/* Make sure icons are visible and properly sized */
+.icon-view .element {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+/* Ensure proper font sizing for readability */
+.icon-view .element-label {
+    max-width: 100%;
+    line-height: 1.1;
+}
+
+.icon-view .element-content {
+    max-width: 100%;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
