@@ -608,7 +608,7 @@ class VisualProgrammingApp {
       const isHidden = toolbar.classList.contains('hidden');
       toolbar.classList.toggle('hidden', !isHidden);
       this.updateStatus(
-        `Toolbar ${isHidden ? 'shown' : 'hidden'} (Ctrl+T to toggle)`, 
+        `Toolbar ${isHidden ? 'shown' : 'hidden'} (Ctrl+Q to toggle)`, 
         'success'
       );
     }

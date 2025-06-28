@@ -322,13 +322,15 @@ body {
   backdrop-filter: blur(20px);
   border: 1px solid var(--border-glass);
   border-radius: 12px;
-  padding: 16px;
+  padding: 0;
   z-index: 100;
   max-height: calc(100vh - 40px);
   overflow-y: auto;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   transform: translateX(0);
   opacity: 1;
+  width: 200px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 .toolbar.hidden {
@@ -337,6 +339,73 @@ body {
   pointer-events: none;
 }
 
+/* Tool Groups */
+.tool-group {
+  border-bottom: 1px solid var(--border-glass);
+  padding: 0;
+}
+
+.tool-group:last-child {
+  border-bottom: none;
+}
+
+.tool-group-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 16px 8px 16px;
+  margin: 0;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Tools Container */
+.tools {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 8px;
+}
+
+/* Individual Tool Buttons */
+.tool {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Inter', sans-serif;
+}
+
+.tool:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-glass);
+  transform: translateX(2px);
+}
+
+.tool:active {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateX(1px);
+}
+
+.tool.active {
+  background: var(--primary-blue);
+  color: #000;
+  font-weight: 600;
+}
+
+/* Toolbar Toggle Button */
 .toolbar-toggle {
   position: fixed;
   top: 20px;
@@ -352,6 +421,7 @@ body {
   color: var(--text-primary);
   transition: all 0.2s ease;
   display: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 .toolbar.hidden ~ .toolbar-toggle,
@@ -362,10 +432,106 @@ body {
 .toolbar-toggle:hover {
   background: rgba(255, 255, 255, 0.1);
   transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
 .toolbar-toggle::before {
   content: '🛠️';
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .toolbar {
+    width: 180px;
+    top: 10px;
+    left: 10px;
+  }
+  
+  .tool-group-title {
+    font-size: 10px;
+    padding: 10px 12px 6px 12px;
+  }
+  
+  .tool {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  
+  .tools {
+    padding: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .toolbar {
+    width: calc(100vw - 20px);
+    max-width: 160px;
+  }
+}
+
+/* Scrollbar Styling for Toolbar */
+.toolbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.toolbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.toolbar::-webkit-scrollbar-thumb {
+  background: var(--border-glass);
+  border-radius: 2px;
+}
+
+.toolbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Improved Visual Hierarchy */
+.tool-group:first-child .tool-group-title {
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+
+/* Action buttons styling */
+.tool-group:last-child .tool {
+  font-weight: 600;
+}
+
+.tool-group:last-child .tool:hover {
+  background: var(--accent-orange);
+  color: #000;
+}
+
+/* Special styling for different action types */
+.tool[data-type="variable"],
+.tool[data-type="array"],
+.tool[data-type="counter"],
+.tool[data-type="object"] {
+  position: relative;
+}
+
+.tool[data-type="variable"]::before { content: "📊"; margin-right: 4px; }
+.tool[data-type="array"]::before { content: "📋"; margin-right: 4px; }
+.tool[data-type="counter"]::before { content: "🔢"; margin-right: 4px; }
+.tool[data-type="object"]::before { content: "📦"; margin-right: 4px; }
+.tool[data-type="function"]::before { content: "⚙️"; margin-right: 4px; }
+.tool[data-type="if"]::before { content: "❓"; margin-right: 4px; }
+.tool[data-type="loop"]::before { content: "🔄"; margin-right: 4px; }
+.tool[data-type="add"]::before { content: "➕"; margin-right: 4px; }
+.tool[data-type="multiply"]::before { content: "✖️"; margin-right: 4px; }
+.tool[data-type="print"]::before { content: "🖨️"; margin-right: 4px; }
+
+/* Connection mode active state */
+.tool#connectMode.active {
+  background: var(--accent-green);
+  color: #000;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 /* Control Panel */
