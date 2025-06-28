@@ -740,3 +740,555 @@ body {
 .connect-mode .element {
     cursor: pointer;
 }
+
+:root {
+    /* Panning-specific CSS variables */
+    --pan-transition: transform 0.1s ease-out;
+    --grab-cursor: grab;
+    --grabbing-cursor: grabbing;
+    
+    /* Default colors if not already defined */
+    --bg-card: rgba(15, 15, 25, 0.9);
+    --primary-blue: #00d4ff;
+    --accent-orange: #f59e0b;
+    --accent-green: #10b981;
+    --accent-indigo: #6366f1;
+    --text-primary: #ffffff;
+    --text-secondary: #a1a1aa;
+    --border-glass: rgba(255, 255, 255, 0.1);
+}
+
+/* ================================
+   CORE PANNING FUNCTIONALITY
+   ================================ */
+
+/* Enhanced Canvas for Panning */
+.canvas {
+    overflow: hidden !important;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+/* Pan Container - Core panning wrapper */
+.pan-container {
+    width: 100%;
+    height: 100%;
+    transform-origin: 0 0;
+    transition: var(--pan-transition);
+    will-change: transform;
+    position: relative;
+}
+
+/* Panning States */
+.canvas.panning {
+    cursor: var(--grabbing-cursor) !important;
+}
+
+.canvas.panning * {
+    pointer-events: none;
+}
+
+.canvas.panning .element {
+    cursor: var(--grabbing-cursor) !important;
+}
+
+/* Space key pan mode */
+.canvas.space-pan-mode {
+    cursor: var(--grab-cursor) !important;
+}
+
+/* Enhanced SVG for Panning */
+.connections-svg {
+    transform-origin: 0 0;
+    transition: var(--pan-transition);
+    will-change: transform;
+    overflow: visible;
+}
+
+/* Elements Enhanced for Panning */
+.element {
+    will-change: transform;
+}
+
+.element.dragging {
+    z-index: 1000;
+    cursor: var(--grabbing-cursor);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* Connection Points Enhanced */
+.connection-point {
+    pointer-events: auto;
+}
+
+/* ================================
+   PAN CONTROL UI COMPONENTS
+   ================================ */
+
+/* Pan Control Buttons */
+.pan-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-glass);
+}
+
+.pan-button {
+    background: var(--accent-indigo);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-family: 'Inter', sans-serif;
+}
+
+.pan-button:hover {
+    background: var(--accent-purple, #8b5cf6);
+    transform: translateY(-1px);
+}
+
+.pan-button:active {
+    transform: translateY(0);
+}
+
+.pan-button.active {
+    background: var(--accent-green);
+    color: #000;
+}
+
+/* Pan Navigation Hints */
+.pan-hint {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    background: var(--bg-card);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    z-index: 90;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    font-family: 'Inter', sans-serif;
+}
+
+.canvas-container:hover .pan-hint {
+    opacity: 1;
+}
+
+.pan-hint.space-mode {
+    background: var(--primary-blue);
+    color: #000;
+    opacity: 1;
+}
+
+/* Pan Indicator */
+.pan-indicator {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent-orange);
+    color: #000;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    font-family: 'Inter', sans-serif;
+}
+
+.pan-indicator.visible {
+    opacity: 1;
+}
+
+/* ================================
+   MINIMAP COMPONENT
+   ================================ */
+
+.minimap {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    width: 150px;
+    height: 100px;
+    background: var(--bg-card);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    z-index: 90;
+    opacity: 0.8;
+    transition: opacity 0.3s ease;
+    overflow: hidden;
+    display: none;
+}
+
+.minimap.visible {
+    display: block;
+}
+
+.minimap:hover {
+    opacity: 1;
+}
+
+.minimap-viewport {
+    position: absolute;
+    border: 2px solid var(--primary-blue);
+    background: rgba(0, 212, 255, 0.1);
+    cursor: move;
+    min-width: 10px;
+    min-height: 8px;
+}
+
+.minimap-element {
+    position: absolute;
+    width: 3px;
+    height: 2px;
+    background: var(--accent-green);
+    border-radius: 1px;
+}
+
+/* ================================
+   ENHANCED STATUS DISPLAY
+   ================================ */
+
+.status.panning {
+    color: var(--primary-blue);
+    border-color: var(--primary-blue);
+}
+
+/* Pan coordinate display in stats */
+.stat.pan-coord {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+}
+
+.stat.pan-coord .stat-value {
+    color: var(--primary-blue);
+}
+
+/* ================================
+   KEYBOARD SHORTCUTS DISPLAY
+   ================================ */
+
+.keyboard-shortcuts .pan-shortcuts {
+    margin-bottom: 12px;
+}
+
+.keyboard-shortcuts .pan-shortcuts .shortcut-title {
+    color: var(--primary-blue);
+}
+
+/* ================================
+   RESPONSIVE DESIGN FOR PANNING
+   ================================ */
+
+@media (max-width: 768px) {
+    .canvas {
+        touch-action: none;
+    }
+    
+    .pan-controls {
+        grid-template-columns: 1fr;
+        gap: 4px;
+    }
+    
+    .pan-button {
+        padding: 6px;
+        font-size: 10px;
+    }
+    
+    .pan-hint {
+        bottom: 10px;
+        right: 10px;
+        font-size: 10px;
+        padding: 6px 10px;
+    }
+    
+    .pan-indicator {
+        font-size: 10px;
+        padding: 3px 10px;
+    }
+    
+    .minimap {
+        width: 120px;
+        height: 80px;
+        bottom: 60px;
+    }
+}
+
+@media (max-width: 480px) {
+    .pan-controls {
+        gap: 3px;
+    }
+    
+    .pan-button {
+        padding: 5px;
+        font-size: 9px;
+    }
+    
+    .pan-hint {
+        font-size: 9px;
+        padding: 5px 8px;
+    }
+    
+    .minimap {
+        width: 100px;
+        height: 60px;
+        bottom: 50px;
+    }
+    
+    .minimap-viewport {
+        border-width: 1px;
+        min-width: 8px;
+        min-height: 6px;
+    }
+    
+    .minimap-element {
+        width: 2px;
+        height: 2px;
+    }
+}
+
+/* ================================
+   ICON VIEW PANNING ADJUSTMENTS
+   ================================ */
+
+.icon-view .pan-controls {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.icon-view .pan-button {
+    padding: 6px;
+    font-size: 10px;
+}
+
+.icon-view .pan-hint {
+    font-size: 10px;
+    padding: 6px 10px;
+}
+
+.icon-view .pan-indicator {
+    font-size: 10px;
+    padding: 3px 10px;
+}
+
+.icon-view .minimap {
+    width: 120px;
+    height: 80px;
+}
+
+.icon-view .minimap-viewport {
+    border-width: 1px;
+    min-width: 8px;
+    min-height: 6px;
+}
+
+.icon-view .minimap-element {
+    width: 2px;
+    height: 2px;
+}
+
+/* ================================
+   ACCESSIBILITY ENHANCEMENTS
+   ================================ */
+
+@media (prefers-reduced-motion: reduce) {
+    .pan-container,
+    .connections-svg {
+        transition: none;
+    }
+    
+    .pan-button:hover {
+        transform: none;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .pan-button {
+        border: 2px solid currentColor;
+    }
+    
+    .pan-hint,
+    .pan-indicator {
+        border: 1px solid currentColor;
+    }
+    
+    .minimap {
+        border: 2px solid var(--primary-blue);
+    }
+}
+
+/* Focus styles for accessibility */
+.pan-button:focus {
+    outline: 2px solid var(--primary-blue);
+    outline-offset: 2px;
+}
+
+.minimap:focus {
+    outline: 2px solid var(--primary-blue);
+    outline-offset: 2px;
+}
+
+/* ================================
+   PRINT STYLES
+   ================================ */
+
+@media print {
+    .pan-controls,
+    .pan-hint,
+    .pan-indicator,
+    .minimap {
+        display: none !important;
+    }
+    
+    .pan-container {
+        transform: none !important;
+    }
+    
+    .connections-svg {
+        transform: none !important;
+    }
+}
+
+/* ================================
+   HIGH DPI DISPLAY SUPPORT
+   ================================ */
+
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 2dppx) {
+    .minimap-element {
+        width: 4px;
+        height: 3px;
+    }
+    
+    .pan-hint,
+    .pan-indicator {
+        backdrop-filter: blur(15px);
+    }
+}
+
+/* ================================
+   DARK MODE ADJUSTMENTS
+   ================================ */
+
+@media (prefers-color-scheme: dark) {
+    .pan-hint {
+        background: rgba(5, 5, 10, 0.95);
+    }
+    
+    .minimap {
+        background: rgba(5, 5, 10, 0.95);
+    }
+}
+
+/* ================================
+   INTEGRATION HELPER CLASSES
+   ================================ */
+
+/* Add this class to your canvas to enable panning */
+.panning-enabled {
+    overflow: hidden;
+    position: relative;
+}
+
+/* Add this class during pan operations */
+.actively-panning {
+    cursor: var(--grabbing-cursor) !important;
+}
+
+.actively-panning * {
+    pointer-events: none !important;
+}
+
+/* Helper class for pan mode indication */
+.pan-mode-active {
+    cursor: var(--grab-cursor) !important;
+}
+
+/* Performance optimization classes */
+.pan-optimized .element {
+    backface-visibility: hidden;
+    transform: translateZ(0);
+}
+
+.pan-optimized .connection-line {
+    shape-rendering: optimizeSpeed;
+}
+
+/* Animation classes for smooth transitions */
+.pan-transition-fast .pan-container,
+.pan-transition-fast .connections-svg {
+    transition: transform 0.05s ease-out;
+}
+
+.pan-transition-slow .pan-container,
+.pan-transition-slow .connections-svg {
+    transition: transform 0.3s ease-out;
+}
+
+.pan-no-transition .pan-container,
+.pan-no-transition .connections-svg {
+    transition: none;
+}
+
+/* ================================
+   UTILITY CLASSES
+   ================================ */
+
+/* Hide pan controls when not needed */
+.hide-pan-controls .pan-controls,
+.hide-pan-controls .pan-hint,
+.hide-pan-controls .pan-indicator {
+    display: none !important;
+}
+
+/* Force show pan controls */
+.show-pan-controls .pan-controls {
+    display: grid !important;
+}
+
+.show-pan-controls .pan-hint {
+    opacity: 1 !important;
+}
+
+/* Compact pan controls for small screens */
+.compact-pan-controls .pan-controls {
+    grid-template-columns: 1fr;
+    gap: 3px;
+}
+
+.compact-pan-controls .pan-button {
+    padding: 4px 6px;
+    font-size: 9px;
+}
+
+/* Large pan controls for accessibility */
+.large-pan-controls .pan-button {
+    padding: 12px 16px;
+    font-size: 13px;
+}
+
+.large-pan-controls .pan-hint {
+    font-size: 13px;
+    padding: 12px 16px;
+}
