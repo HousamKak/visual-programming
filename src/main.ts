@@ -204,6 +204,20 @@ class VisualProgrammingApp {
    * @throws {Error} If initialization fails
    */
   constructor(options: AppOptions = {}) {
+    // Initialize state FIRST before anything that might throw
+    this.state = {
+      isInitialized: false,
+      hasError: false,
+      startTime: Date.now(),
+      features: [],
+    } as AppState;
+
+    this.undoRedoState = {
+      undoStack: [],
+      redoStack: [],
+      maxStackSize: 50, // default, will be updated from options
+    } as UndoRedoState;
+
     try {
       validateAppOptions(options);
 
@@ -219,19 +233,8 @@ class VisualProgrammingApp {
         ...options,
       };
 
-      // Initialize state
-      this.state = {
-        isInitialized: false,
-        hasError: false,
-        startTime: Date.now(),
-        features: [],
-      } as AppState;
-
-      this.undoRedoState = {
-        undoStack: [],
-        redoStack: [],
-        maxStackSize: this.options.maxUndoSteps,
-      } as UndoRedoState;
+      // Update maxStackSize from options
+      (this.undoRedoState as any).maxStackSize = this.options.maxUndoSteps;
 
       // Get and validate DOM elements
       this.elements = this.getDOMElements();
@@ -519,9 +522,22 @@ class VisualProgrammingApp {
         { signal }
       );
 
+      // Add button event listener for togglePanel
+      document.getElementById("togglePanel")?.addEventListener("click", () => {
+        this.toggleControlPanel();
+      }, { signal });
+
+      // Toolbar toggle button
+      const toolbarToggle = document.getElementById('toolbarToggle');
+      if (toolbarToggle) {
+        toolbarToggle.addEventListener('click', () => {
+          this.toggleToolbar();
+        }, { signal });
+      }
+
       // Keyboard shortcuts
+      document.addEventListener('keydown', this.handleKeyDown, { signal });
       if (this.options.enableKeyboardShortcuts) {
-        document.addEventListener("keydown", this.handleKeyDown, { signal });
         this.state.features.push("Keyboard Shortcuts");
       }
 
@@ -569,6 +585,36 @@ class VisualProgrammingApp {
   }
 
   /**
+   * Toggle control panel visibility
+   */
+  private toggleControlPanel(): void {
+    const controlPanel = document.querySelector('.control-panel') as HTMLElement;
+    if (controlPanel) {
+      const isHidden = controlPanel.style.display === 'none';
+      controlPanel.style.display = isHidden ? 'block' : 'none';
+      this.updateStatus(
+        `Control panel ${isHidden ? 'shown' : 'hidden'} (Ctrl+P to toggle)`, 
+        'success'
+      );
+    }
+  }
+
+  /**
+   * Toggle toolbar visibility
+   */
+  private toggleToolbar(): void {
+    const toolbar = document.querySelector('.toolbar') as HTMLElement;
+    if (toolbar) {
+      const isHidden = toolbar.classList.contains('hidden');
+      toolbar.classList.toggle('hidden', !isHidden);
+      this.updateStatus(
+        `Toolbar ${isHidden ? 'shown' : 'hidden'} (Ctrl+T to toggle)`, 
+        'success'
+      );
+    }
+  }
+
+  /**
    * Handle keyboard shortcuts
    */
   private readonly handleKeyDown = (e: KeyboardEvent): void => {
@@ -598,6 +644,14 @@ class VisualProgrammingApp {
         case "y":
           e.preventDefault();
           this.redo();
+          break;
+        case "p":
+          e.preventDefault();
+          this.toggleControlPanel();
+          break;
+        case 't':
+          e.preventDefault();
+          this.toggleToolbar();
           break;
       }
     }
