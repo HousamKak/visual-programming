@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Programming Framework</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/src/themes/card.css">
+</head>
+<body>
+    <div class="canvas-container">
+        <div class="canvas" id="canvas">
+            <svg class="connections-svg" id="connectionsSvg"></svg>
+        </div>
+    </div>
+
+    <div class="toolbar">
+        <div class="tool-group">
+            <div class="tool-group-title">Data Types</div>
+            <div class="tools">
+                <button class="tool" data-type="variable">Variable</button>
+                <button class="tool" data-type="array">Array</button>
+                <button class="tool" data-type="counter">Counter</button>
+                <button class="tool" data-type="object">Object</button>
+                <button class="tool" data-type="string_concat">Concat</button>
+                <button class="tool" data-type="comment">Comment</button>
+            </div>
+        </div>
+        
+        <div class="tool-group">
+            <div class="tool-group-title">Control Flow</div>
+            <div class="tools">
+                <button class="tool" data-type="if">If</button>
+                <button class="tool" data-type="loop">Loop</button>
+                <button class="tool" data-type="function">Function</button>
+                <button class="tool" data-type="return">Return</button>
+                <button class="tool" data-type="delay">Delay</button>
+            </div>
+        </div>
+
+        <div class="tool-group">
+            <div class="tool-group-title">Math & Logic</div>
+            <div class="tools">
+                <button class="tool" data-type="add">Add</button>
+                <button class="tool" data-type="subtract">Subtract</button>
+                <button class="tool" data-type="multiply">Multiply</button>
+                <button class="tool" data-type="divide">Divide</button>
+                <button class="tool" data-type="modulo">Modulo</button>
+                <button class="tool" data-type="compare">Compare</button>
+                <button class="tool" data-type="and">AND</button>
+                <button class="tool" data-type="or">OR</button>
+                <button class="tool" data-type="not">NOT</button>
+                <button class="tool" data-type="random">Random</button>
+            </div>
+        </div>
+
+        <div class="tool-group">
+            <div class="tool-group-title">I/O</div>
+            <div class="tools">
+                <button class="tool" data-type="print">Print</button>
+                <button class="tool" data-type="prompt">Input</button>
+            </div>
+        </div>
+        
+        <div class="tool-group">
+            <div class="tool-group-title">Actions</div>
+            <div class="tools">
+                <button class="tool" id="connectMode">🔗 Connect</button>
+                <button class="tool" id="toggleView">🎛 View</button>
+                <button class="tool" id="clearAll">🗑 Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="control-panel">
+        <button class="run-button" id="runCode">▶ Execute Code</button>
+        <button class="save-button" id="saveCode">💾 Save</button>
+        <button class="load-button" id="loadCode">📁 Load</button>
+        
+        <div class="info-section">
+            <div class="info-title">Visual Programming</div>
+            <div class="info-text">
+                Drag elements from the toolbar to create your program flow.
+                Use Connect mode to link elements together.
+                Toggle between card and icon views for different levels of detail.
+            </div>
+        </div>
+        
+        <div class="stats">
+            <div class="stat">
+                <span class="stat-label">Elements:</span>
+                <span class="stat-value" id="elementCount">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Connections:</span>
+                <span class="stat-value" id="connectionCount">0</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="status" id="status">Ready to program</div>
+
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

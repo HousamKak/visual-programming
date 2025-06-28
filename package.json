@@ -1,0 +1,22 @@
+{
+  "name": "visual-programming-framework",
+  "version": "1.0.0",
+  "description": "A modular visual programming mini-framework with card/icon views",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "serve": "vite --host 0.0.0.0 --port 3000"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "lodash-es": "^4.17.21"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

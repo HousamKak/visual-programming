@@ -1,0 +1,301 @@
+# Visual Programming Framework - Comprehensive .gitignore
+
+# ===========================================
+# Dependencies
+# ===========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Package manager lock files (keep only one)
+package-lock.json
+yarn.lock
+# pnpm-lock.yaml
+
+# ===========================================
+# Build Output
+# ===========================================
+dist/
+build/
+out/
+.output/
+.vite/
+.next/
+.nuxt/
+.cache/
+
+# Compiled binary addons
+build/Release
+
+# ===========================================
+# Environment Files
+# ===========================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
+# ===========================================
+# TypeScript
+# ===========================================
+*.tsbuildinfo
+.tscache/
+
+# TypeScript incremental compilation
+*.tsbuildinfo
+
+# ===========================================
+# Vite
+# ===========================================
+dist-ssr
+*.local
+
+# ===========================================
+# Testing
+# ===========================================
+coverage/
+.nyc_output/
+.coverage/
+*.lcov
+
+# Jest
+jest.config.js
+__tests__/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# ===========================================
+# IDE and Editor Files
+# ===========================================
+
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+
+# JetBrains IDEs (WebStorm, IntelliJ, etc.)
+.idea/
+*.swp
+*.swo
+*~
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+*.swp
+*.swo
+*~
+.vim/
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# ===========================================
+# Operating System Files
+# ===========================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ===========================================
+# Logs
+# ===========================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# ===========================================
+# Temporary Files
+# ===========================================
+tmp/
+temp/
+.tmp/
+.temp/
+
+# ===========================================
+# Project Specific
+# ===========================================
+
+# Visual Programming saves/exports
+exports/
+saves/
+programs/
+*.vpf
+*.vp.json
+
+# Auto-generated documentation
+docs/generated/
+api-docs/
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# ===========================================
+# Development Tools
+# ===========================================
+
+# ESLint cache
+.eslintcache
+
+# Prettier cache
+.prettiercache
+
+# Stylelint cache
+.stylelintcache
+
+# Parcel cache
+.parcel-cache/
+
+# Webpack
+.webpack/
+
+# Rollup
+.rollup.cache/
+
+# Turbo
+.turbo/
+
+# ===========================================
+# Cloud and Deployment
+# ===========================================
+
+# Vercel
+.vercel
+
+# Netlify
+.netlify/
+
+# AWS
+.aws/
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# ===========================================
+# Database
+# ===========================================
+*.sqlite
+*.sqlite3
+*.db
+*.db3
+
+# ===========================================
+# Miscellaneous
+# ===========================================
+
+# Sentry
+.sentryclirc
+
+# Bundle analysis
+bundle-analyzer-report.html
+
+# Storybook
+storybook-static/
+
+# Rush
+common/temp/
+
+# ===========================================
+# Security
+# ===========================================
+.secrets/
+secrets.*
+*.pem
+*.p12
+*.key
+*.crt
+*.csr
+
+# ===========================================
+# Custom Project Files
+# ===========================================
+
+# Add any project-specific files here
+# examples/
+# prototypes/
+# research/
+
+# User-specific block definitions (if allowing custom blocks)
+# src/blocks/custom/
+# plugins/user/
+
+# Generated type definitions
+# types/generated/

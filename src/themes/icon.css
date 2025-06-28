@@ -1,0 +1,152 @@
+/* Icon view theme - miniature blocks */
+:root {
+    --block-w: 48px;
+    --block-h: 48px;
+    --block-h-circle: 48px;
+    --grid-size: 12px;
+}
+
+body.icon-view {
+    /* Override card view */
+}
+
+.icon-view .element {
+    width: var(--block-w);
+    height: var(--block-h);
+    min-height: var(--block-h);
+    border-radius: 6px;
+    padding: 4px;
+}
+
+.icon-view .element.circular {
+    height: var(--block-h-circle);
+    border-radius: 50%;
+}
+
+.icon-view .element-label {
+    font-size: 8px;
+    margin-bottom: 1px;
+    opacity: 0.8;
+    display: none;
+}
+
+.icon-view .element-content {
+    font-size: 9px;
+    max-height: 20px;
+    line-height: 1;
+    display: none;
+}
+
+.icon-view .element-value {
+    font-size: 10px;
+    display: none;
+}
+
+/* Hide detailed content in icon view */
+.icon-view .array-container {
+    transform: scale(0.7);
+}
+
+.icon-view .array-item {
+    width: 8px;
+    height: 8px;
+    font-size: 6px;
+}
+
+.icon-view .array-bracket {
+    font-size: 10px;
+}
+
+/* Connection points scaling */
+.icon-view .connection-point {
+    width: 8px;
+    height: 8px;
+}
+
+.icon-view .input-point {
+    left: -4px;
+}
+
+.icon-view .output-point {
+    right: -4px;
+}
+
+/* Reduce loop animation size */
+.icon-view .element.loop::after {
+    width: 8px;
+    height: 8px;
+    right: 4px;
+}
+
+/* Toolbar adjustments for icon view */
+.icon-view .toolbar {
+    max-width: 200px;
+}
+
+.icon-view .tools {
+    gap: 4px;
+}
+
+.icon-view .tool {
+    padding: 4px 8px;
+    font-size: 10px;
+}
+
+/* Connection lines for icon view */
+.icon-view .connection-line {
+    stroke-width: 1.5;
+}
+
+.icon-view .connection-line:hover,
+.icon-view .connection-line.active {
+    stroke-width: 2;
+}
+
+/* Animation adjustments */
+.icon-view .element:hover {
+    transform: translateY(-1px) scale(1.05);
+}
+
+.icon-view .element.selected {
+    transform: scale(1.15);
+}
+
+/* Flow particles */
+.icon-view .flow-particle {
+    width: 4px;
+    height: 4px;
+}
+
+/* Transition animation between views */
+.element {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.connection-line {
+    transition: all 0.3s ease;
+}
+
+/* Icon view specific positioning adjustments */
+.icon-view .canvas {
+    background-size: var(--grid-size) var(--grid-size);
+}
+
+/* Ensure text remains readable */
+.icon-view .element-content {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Special handling for complex elements */
+.icon-view .element.function .element-content {
+    text-align: center;
+}
+
+.icon-view .element.array .element-content {
+    justify-content: center;
+}
+
+.icon-view .element.object .element-content {
+    text-align: center;
+}
