@@ -1,5 +1,5 @@
 /**
- *  Main Application Entry Point
+ * Main Application Entry Point
  * Includes assignment operations and inline editing capabilities
  */
 
@@ -10,19 +10,16 @@ import {
   addViewTransitionStyles,
 } from "./ui/viewToggle.js";
 import { BlockRegistry } from "./core/registry.js";
-import { registerBlocks } from "./-registry.js";
-import { EditableElements } from "./editable-elements.js";
 import type { ElementData, ConnectionData } from "./core/renderer.js";
 
 // ---------------------------------------------------------------------------
-//  App Implementation
+// App Implementation
 // ---------------------------------------------------------------------------
 
 class VisualProgrammingApp {
   private readonly elements: any;
   private readonly editor: Editor;
   private readonly viewToggle: ViewToggle;
-  private readonly editableElements: EditableElements;
   private readonly options: Required<any>;
   private readonly state: any;
   private readonly undoRedoState: any;
@@ -57,30 +54,17 @@ class VisualProgrammingApp {
         enableExample: true,
         persistViewMode: true,
         enableInlineEditing: true,
-        enableBlocks: true,
         ...options,
       };
 
       // Get DOM elements
       this.elements = this.getDOMElements();
 
-      // Register  blocks first
-      if (this.options.enableBlocks) {
-        registerBlocks();
-        this.state.features.push(" Assignment Blocks");
-      }
-
       // Initialize view toggle
       this.viewToggle = this.initializeViewToggle();
 
       // Initialize editor
       this.editor = this.initializeEditor();
-
-      // Initialize editable elements system
-      if (this.options.enableInlineEditing) {
-        this.editableElements = this.initializeEditableElements();
-        this.state.features.push("Inline Editing");
-      }
 
       // Setup all features
       this.setupEventListeners();
@@ -89,7 +73,7 @@ class VisualProgrammingApp {
       // Mark as initialized
       (this.state as any).isInitialized = true;
 
-      console.log(" Visual Programming Framework initialized");
+      console.log("🚀 Visual Programming Framework initialized");
       console.log("Available block types:", BlockRegistry.getTypes());
       console.log("Enabled features:", this.state.features);
 
@@ -97,29 +81,13 @@ class VisualProgrammingApp {
       (this.state as any).hasError = true;
       (this.state as any).errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error("Failed to initialize  Framework:", error);
+      console.error("Failed to initialize Framework:", error);
       throw error;
     }
   }
 
   /**
-   * Initialize editable elements system
-   */
-  private initializeEditableElements(): EditableElements {
-    return new EditableElements(this.editor, {
-      enableDoubleClickEdit: true,
-      enableContextMenu: true,
-      enablePropertyPanel: true,
-      onPropertyChanged: (elementId, property, value) => {
-        console.log(`Property changed: ${elementId}.${property} = ${value}`);
-        this.saveUndoState();
-        this.updateStatus(`Updated ${property} for element`, 'success');
-      }
-    });
-  }
-
-  /**
-   * Get required DOM elements with  toolbar
+   * Get required DOM elements
    */
   private getDOMElements(): any {
     const validateElement = (id: string) => {
@@ -141,6 +109,8 @@ class VisualProgrammingApp {
       toggleViewButton: validateElement("toggleView"),
       connectModeButton: validateElement("connectMode"),
       clearAllButton: validateElement("clearAll"),
+      togglePanelButton: document.getElementById("togglePanel"),
+      showHelpButton: document.getElementById("showHelp"),
       elementCountElement: validateElement("elementCount"),
       connectionCountElement: validateElement("connectionCount"),
     };
@@ -172,7 +142,7 @@ class VisualProgrammingApp {
   }
 
   /**
-   * Initialize editor with  options
+   * Initialize editor with options
    */
   private initializeEditor(): Editor {
     const editorOptions: EditorOptions = {
@@ -184,6 +154,7 @@ class VisualProgrammingApp {
       maxConnections: 2000,
       enableKeyboardShortcuts: this.options.enableKeyboardShortcuts,
       enableAutoSave: this.options.enableAutoSave,
+      enableInlineEditing: this.options.enableInlineEditing,
       autoSaveInterval: this.options.autoSaveInterval,
       onElementAdded: () => {
         this.updateStats();
@@ -203,46 +174,56 @@ class VisualProgrammingApp {
       },
       onStatusUpdate: (message, type) => this.updateStatus(message, type),
       onCanvasChanged: () => this.saveUndoState(),
+      onPropertyChanged: (elementId, property, value) => {
+        console.log(`Property changed: ${elementId}.${property} = ${value}`);
+        this.saveUndoState();
+        this.updateStatus(`Updated ${property} for element`, 'success');
+      }
     };
 
     const editor = new Editor(editorOptions);
-    this.state.features.push(" Visual Editor");
+    this.state.features.push("Visual Editor");
+    
+    if (this.options.enableInlineEditing) {
+      this.state.features.push("Inline Editing");
+    }
+    
     return editor;
   }
 
   /**
-   * Setup  event listeners
+   * Setup event listeners
    */
   private setupEventListeners(): void {
     this.eventAbortController = new AbortController();
     const signal = this.eventAbortController.signal;
 
-    //  toolbar with new block types
+    // Toolbar with assignment block types
     this.elements.toolbar.addEventListener(
       "click",
-      (e) => {
-        const tool = (e.target as Element).closest(".tool") as HTMLElement;
-        if (!tool?.dataset.type) return;
+      (e: MouseEvent) => {
+      const tool = (e.target as Element).closest(".tool") as HTMLElement | null;
+      if (!tool?.dataset.type) return;
 
-        try {
-          // Add some default positions for better UX
-          const centerX = this.elements.canvas.clientWidth / 2 - 70;
-          const centerY = this.elements.canvas.clientHeight / 2 - 32;
-          const randomOffset = () => (Math.random() - 0.5) * 200;
-          
-          this.editor.addElement(
-            tool.dataset.type,
-            centerX + randomOffset(),
-            centerY + randomOffset()
-          );
-        } catch (error) {
-          this.updateStatus(
-            `Failed to add ${tool.dataset.type}: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-            "error"
-          );
-        }
+      try {
+        // Add some default positions for better UX
+        const centerX = this.elements.canvas.clientWidth / 2 - 70;
+        const centerY = this.elements.canvas.clientHeight / 2 - 32;
+        const randomOffset = (): number => (Math.random() - 0.5) * 200;
+
+        this.editor.addElement(
+        tool.dataset.type as string,
+        centerX + randomOffset(),
+        centerY + randomOffset()
+        );
+      } catch (error) {
+        this.updateStatus(
+        `Failed to add ${tool?.dataset.type}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        "error"
+        );
+      }
       },
       { signal }
     );
@@ -273,25 +254,32 @@ class VisualProgrammingApp {
       { signal }
     );
 
-    //  keyboard shortcuts
+    // Panel toggle button
+    if (this.elements.togglePanelButton) {
+      this.elements.togglePanelButton.addEventListener(
+        "click",
+        () => this.toggleControlPanel(),
+        { signal }
+      );
+    }
+
+    // Help button
+    if (this.elements.showHelpButton) {
+      this.elements.showHelpButton.addEventListener(
+        "click",
+        () => this.showHelpDialog(),
+        { signal }
+      );
+    }
+
+    // Keyboard shortcuts
     document.addEventListener("keydown", this.handleKeyDown, { signal });
 
-    // Prevent context menu on canvas (handled by editable elements)
-    this.elements.canvas.addEventListener(
-      "contextmenu",
-      (e) => {
-        if (!(e.target as Element).closest('.element')) {
-          e.preventDefault();
-        }
-      },
-      { signal }
-    );
-
-    this.state.features.push(" Event Handling");
+    this.state.features.push("Event Handling");
   }
 
   /**
-   *  keyboard shortcuts
+   * Keyboard shortcuts including assignment operations
    */
   private readonly handleKeyDown = (e: KeyboardEvent): void => {
     if (e.ctrlKey || e.metaKey) {
@@ -329,10 +317,14 @@ class VisualProgrammingApp {
           e.preventDefault();
           this.selectAll();
           break;
+        case "q":
+          e.preventDefault();
+          this.toggleToolbar();
+          break;
       }
     }
 
-    // Quick add shortcuts
+    // Quick add shortcuts for assignment operations
     if (e.altKey) {
       let blockType: string | null = null;
       switch (e.key) {
@@ -344,6 +336,21 @@ class VisualProgrammingApp {
         case "p": blockType = "print"; break;
         case "s": blockType = "set_variable"; break;
         case "g": blockType = "get_variable"; break;
+        case "w": blockType = "while_loop"; break;
+        case "r": blockType = "for_range"; break;
+        case "i": blockType = "if_assign"; break;
+        case "o": blockType = "object"; break;
+        case "x": blockType = "string_concat"; break;
+        case "1": blockType = "array_push"; break;
+        case "2": blockType = "array_pop"; break;
+        case "3": blockType = "array_get"; break;
+        case "4": blockType = "array_set"; break;
+        case "5": blockType = "object_get"; break;
+        case "6": blockType = "object_set"; break;
+        case "7": blockType = "counter_increment"; break;
+        case "8": blockType = "counter_reset"; break;
+        case "9": blockType = "add_assign"; break;
+        case "0": blockType = "multiply_assign"; break;
       }
       
       if (blockType) {
@@ -356,10 +363,16 @@ class VisualProgrammingApp {
         }
       }
     }
+
+    // Help shortcut
+    if (e.key === "?" && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      this.showHelpDialog();
+    }
   };
 
   /**
-   * Setup  features
+   * Setup features
    */
   private setupFeatures(): void {
     if (this.options.enableUndoRedo) {
@@ -374,7 +387,7 @@ class VisualProgrammingApp {
 
     if (this.options.enableExample) {
       this.buildExampleProgram();
-      this.state.features.push(" Example Program");
+      this.state.features.push("Example Program");
     }
 
     this.updateStats();
@@ -390,23 +403,30 @@ class VisualProgrammingApp {
       "Ctrl+O: Load program", 
       "Ctrl+Enter: Execute program",
       "Ctrl+Z/Y: Undo/Redo",
+      "Ctrl+Q: Toggle toolbar",
       "Double-click: Edit element",
       "Right-click: Context menu",
       "Alt+V: Add Variable",
       "Alt+S: Add Set Variable",
+      "Alt+G: Add Get Variable",
+      "Alt+A: Add Array",
       "Alt+F: Add Function",
-      "Alt+L: Add Loop"
+      "Alt+L: Add Loop",
+      "Alt+W: Add While Loop",
+      "Alt+R: Add For Range",
+      "Alt+1-9: Array/Object ops",
+      "?: Show help"
     ];
 
-    console.log("🎯  Visual Programming Framework");
-    console.log("⌨️  Keyboard shortcuts:");
+    console.log("🎯 Visual Programming Framework");
+    console.log("⌨️ Keyboard shortcuts:");
     shortcuts.forEach(shortcut => console.log(`   ${shortcut}`));
     
-    this.updateStatus(" framework ready! Try Alt+V to add a variable", "success");
+    this.updateStatus("Framework ready! Try Alt+V to add a variable or ? for help", "success");
   }
 
   /**
-   * Build  example program
+   * Build example program with assignment operations
    */
   private buildExampleProgram(): void {
     try {
@@ -444,6 +464,16 @@ class VisualProgrammingApp {
         message: "Loop iteration"
       });
 
+      const addAssignId = this.editor.addElement("add_assign", 900, 150);
+
+      const objId = this.editor.addElement("object", 100, 350, {
+        properties: { name: "example", value: 42 }
+      });
+
+      const objGetId = this.editor.addElement("object_get", 300, 350, {
+        key: "name"
+      });
+
       // Create connections with delay
       setTimeout(() => {
         try {
@@ -452,11 +482,13 @@ class VisualProgrammingApp {
           this.editor.createConnection(arrayId, arrayPushId);
           this.editor.createConnection(forLoopId, incCounterId);
           this.editor.createConnection(forLoopId, printId);
+          this.editor.createConnection(getVarId, addAssignId);
+          this.editor.createConnection(objId, objGetId);
 
           this.updateStats();
           this.saveUndoState();
           this.updateStatus(
-            " example loaded! Double-click elements to edit their values",
+            "Example loaded! Double-click elements to edit, right-click for context menu",
             "success"
           );
         } catch (error) {
@@ -465,12 +497,12 @@ class VisualProgrammingApp {
       }, 200);
 
     } catch (error) {
-      console.warn("Failed to build  example:", error);
+      console.warn("Failed to build example:", error);
     }
   }
 
   /**
-   *  program execution
+   * Program execution
    */
   private async executeProgram(): Promise<void> {
     try {
@@ -500,6 +532,46 @@ class VisualProgrammingApp {
     } finally {
       this.elements.runButton.textContent = "▶ Execute Code";
       (this.elements.runButton as HTMLButtonElement).disabled = false;
+    }
+  }
+
+  /**
+   * Toggle toolbar visibility
+   */
+  private toggleToolbar(): void {
+    const toolbar = this.elements.toolbar;
+    toolbar.classList.toggle('hidden');
+    
+    if (toolbar.classList.contains('hidden')) {
+      this.updateStatus("Toolbar hidden (Ctrl+Q to show)", "success");
+    } else {
+      this.updateStatus("Toolbar shown", "success");
+    }
+  }
+
+  /**
+   * Toggle control panel visibility
+   */
+  private toggleControlPanel(): void {
+    const panel = document.querySelector('.control-panel') as HTMLElement;
+    if (panel) {
+      panel.classList.toggle('hidden');
+      
+      if (panel.classList.contains('hidden')) {
+        this.updateStatus("Control panel hidden", "success");
+      } else {
+        this.updateStatus("Control panel shown", "success");
+      }
+    }
+  }
+
+  /**
+   * Show help dialog
+   */
+  private showHelpDialog(): void {
+    const helpOverlay = document.getElementById('helpOverlay');
+    if (helpOverlay) {
+      helpOverlay.style.display = 'flex';
     }
   }
 
@@ -537,15 +609,15 @@ class VisualProgrammingApp {
     this.updateStatus("Select all not yet implemented", "error");
   }
 
-  // Save/Load/Stats methods remain the same as original...
+  // Save/Load/Stats methods
   private saveProgram(): void {
     try {
       const state = this.editor.getState();
       const timestamp = new Date().toISOString().split("T")[0];
-      const filename = `-visual-program-${timestamp}.json`;
+      const filename = `visual-program-${timestamp}.json`;
 
       localStorage.setItem(
-        "-visual-programming-backup",
+        "visual-programming-backup",
         JSON.stringify({
           ...state,
           savedAt: new Date().toISOString(),
@@ -631,7 +703,7 @@ class VisualProgrammingApp {
     }
   }
 
-  // Undo/Redo methods...
+  // Undo/Redo methods
   private setupUndoRedo(): void {
     this.saveUndoState();
   }
@@ -689,7 +761,7 @@ class VisualProgrammingApp {
   }
 
   private setupMinimap(): void {
-    // Minimap implementation same as original...
+    console.log("Minimap feature placeholder");
   }
 
   dispose(): void {
@@ -700,10 +772,9 @@ class VisualProgrammingApp {
       
       this.editor?.dispose();
       this.viewToggle?.dispose();
-      this.editableElements?.dispose();
       
       this.isDisposed = true;
-      console.log(" Visual Programming Framework disposed");
+      console.log("Visual Programming Framework disposed");
     } catch (error) {
       console.error("Error during app disposal:", error);
     }
@@ -711,7 +782,7 @@ class VisualProgrammingApp {
 }
 
 // ---------------------------------------------------------------------------
-// Initialize  Application
+// Initialize Application
 // ---------------------------------------------------------------------------
 
 function initializeApp(): void {
@@ -724,19 +795,18 @@ function initializeApp(): void {
       enableExample: true,
       persistViewMode: true,
       enableInlineEditing: true,
-      enableBlocks: true,
     });
 
     // Expose for debugging
     if (typeof window !== "undefined") {
-      (window as any).App = app;
+      (window as any).VisualProgrammingApp = app;
       (window as any).BlockRegistry = BlockRegistry;
     }
 
-    console.log("🚀  Visual Programming Framework fully initialized");
+    console.log("🚀 Visual Programming Framework fully initialized");
     
   } catch (error) {
-    console.error("❌ Failed to initialize  application:", error);
+    console.error("❌ Failed to initialize application:", error);
   }
 }
 

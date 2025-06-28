@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Visual Programming Framework</title>
+    <title>Visual Programming Framework</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/src/themes/card.css">
     <style>
-        /* Enhanced styles for new features */
+        /* Styles for new features */
         .inline-element-editor {
             font-family: 'Inter', sans-serif;
         }
@@ -32,6 +32,7 @@
             right: 0;
             bottom: 0;
             background: rgba(0, 0, 0, 0.8);
+            -webkit-backdrop-filter: blur(10px);
             backdrop-filter: blur(10px);
             z-index: 3000;
             display: none;
@@ -192,21 +193,31 @@
         <button class="load-button" id="loadCode">📁 Load</button>
         
         <div class="info-section">
-            <div class="info-title">Enhanced Visual Programming</div>
+            <div class="info-title">Visual Programming Framework</div>
             <div class="info-text">
-                <strong>New Features:</strong><br>
+                <strong>Features:</strong><br>
                 • Double-click elements to edit values<br>
                 • Right-click for context menu<br>
                 • Assignment operations for variables<br>
                 • Array manipulation blocks<br>
+                • Object property operations<br>
                 • Enhanced loops and conditions<br>
                 • Math assignment operators<br>
+                • String concatenation<br>
                 <br>
                 <strong>Quick Add (Alt+Key):</strong><br>
                 Alt+V: Variable | Alt+S: Set Variable<br>
-                Alt+A: Array | Alt+F: Function<br>
-                Alt+L: Loop | Alt+C: Counter<br>
-                Alt+P: Print | Alt+G: Get Variable
+                Alt+G: Get Variable | Alt+A: Array<br>
+                Alt+F: Function | Alt+L: Loop<br>
+                Alt+W: While Loop | Alt+R: For Range<br>
+                Alt+C: Counter | Alt+P: Print<br>
+                Alt+1-9: Array/Object operations<br>
+                Alt+0: Multiply Assign<br>
+                <br>
+                <strong>More Shortcuts:</strong><br>
+                ?: Help | Ctrl+Q: Toggle toolbar<br>
+                Ctrl+Z/Y: Undo/Redo<br>
+                Ctrl+D: Duplicate element
             </div>
         </div>
         
@@ -222,22 +233,23 @@
         </div>
     </div>
 
-    <div class="status" id="status">Enhanced framework ready</div>
+    <div class="status" id="status">Framework ready</div>
 
     <!-- Help Overlay -->
     <div class="help-overlay" id="helpOverlay">
         <div class="help-content">
-            <div class="help-title">Enhanced Visual Programming Framework - Help</div>
+            <div class="help-title">Visual Programming Framework - Help</div>
             
             <div class="help-section">
-                <h3>🎯 New Assignment Features</h3>
-                <p>This enhanced framework includes powerful assignment and data manipulation blocks:</p>
+                <h3>🎯 Assignment Features</h3>
+                <p>This framework includes powerful assignment and data manipulation blocks:</p>
                 <ul>
                     <li><strong>Set/Get Variable:</strong> Store and retrieve values by name</li>
                     <li><strong>Array Operations:</strong> Push, pop, get/set by index</li>
                     <li><strong>Object Properties:</strong> Get/set object properties</li>
                     <li><strong>Math Assignment:</strong> += and *= operators</li>
                     <li><strong>Enhanced Loops:</strong> While loops and for-range loops</li>
+                    <li><strong>String Operations:</strong> Concatenate strings with separators</li>
                 </ul>
             </div>
 
@@ -250,6 +262,7 @@
                     <span class="help-shortcut-key">Ctrl+Z</span><span>Undo</span>
                     <span class="help-shortcut-key">Ctrl+Y</span><span>Redo</span>
                     <span class="help-shortcut-key">Ctrl+D</span><span>Duplicate selected</span>
+                    <span class="help-shortcut-key">Ctrl+Q</span><span>Toggle toolbar</span>
                     <span class="help-shortcut-key">Delete</span><span>Delete selected</span>
                     <span class="help-shortcut-key">Double-click</span><span>Edit element</span>
                     <span class="help-shortcut-key">Right-click</span><span>Context menu</span>
@@ -265,8 +278,14 @@
                     <span class="help-shortcut-key">Alt+A</span><span>Add Array</span>
                     <span class="help-shortcut-key">Alt+F</span><span>Add Function</span>
                     <span class="help-shortcut-key">Alt+L</span><span>Add Loop</span>
+                    <span class="help-shortcut-key">Alt+W</span><span>Add While Loop</span>
+                    <span class="help-shortcut-key">Alt+R</span><span>Add For Range</span>
                     <span class="help-shortcut-key">Alt+C</span><span>Add Counter</span>
                     <span class="help-shortcut-key">Alt+P</span><span>Add Print</span>
+                    <span class="help-shortcut-key">Alt+1-4</span><span>Array operations</span>
+                    <span class="help-shortcut-key">Alt+5-6</span><span>Object operations</span>
+                    <span class="help-shortcut-key">Alt+7-8</span><span>Counter operations</span>
+                    <span class="help-shortcut-key">Alt+9-0</span><span>Math assignment</span>
                 </div>
             </div>
 
@@ -276,9 +295,12 @@
                     <li>Use <strong>Set Variable</strong> to store values that other blocks can access</li>
                     <li>Connect arrays to <strong>Array Push/Pop</strong> to modify them</li>
                     <li>Use <strong>For Range</strong> loops for counted iterations</li>
+                    <li>Use <strong>While Loop</strong> for condition-based iterations</li>
                     <li>Double-click any element to edit its properties inline</li>
                     <li>Right-click elements for duplicate/delete options</li>
                     <li>Toggle between card and icon views for different detail levels</li>
+                    <li>Use <strong>Object Get/Set</strong> to work with structured data</li>
+                    <li>Use <strong>String Concat</strong> to build dynamic text values</li>
                 </ul>
             </div>
 
@@ -290,10 +312,16 @@
     </div>
 
     <script type="module">
-        // Enhanced main application
-        import('./src/enhanced-main.js').catch(() => {
-            // Fallback to regular main if enhanced version not available
-            import('./src/main.js');
+        // Main application import
+        import('./src/main.js').catch((error) => {
+            console.error('Failed to load main application:', error);
+            
+            // Show error message to user
+            const status = document.getElementById('status');
+            if (status) {
+                status.textContent = 'Failed to load application. Check console for details.';
+                status.className = 'status error';
+            }
         });
 
         // Show help overlay
@@ -308,15 +336,15 @@
             }
         });
 
-        // Enhanced status messages
+        // Status messages
         const statusEl = document.getElementById('status');
         if (statusEl) {
-            statusEl.textContent = 'Enhanced Visual Programming Framework - Double-click elements to edit!';
+            statusEl.textContent = 'Visual Programming Framework - Double-click elements to edit!';
         }
 
-        // Add enhanced visual feedback
+        // Add visual feedback for new block types
         document.addEventListener('DOMContentLoaded', () => {
-            // Add glow effect to new block types
+            // Add glow effect to new blocks
             const newBlocks = document.querySelectorAll('.new-block-highlight');
             newBlocks.forEach(block => {
                 block.addEventListener('mouseenter', () => {
@@ -335,6 +363,25 @@
                     status.className = 'status success';
                 }
             }, 2000);
+        });
+
+        // Global error handling
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('Unhandled promise rejection:', event.reason);
+            const status = document.getElementById('status');
+            if (status) {
+                status.textContent = 'An error occurred. Check console for details.';
+                status.className = 'status error';
+            }
+        });
+        
+        window.addEventListener('error', (event) => {
+            console.error('Global error:', event.error);
+            const status = document.getElementById('status');
+            if (status) {
+                status.textContent = 'An error occurred. Check console for details.';
+                status.className = 'status error';
+            }
         });
     </script>
 </body>

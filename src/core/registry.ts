@@ -3,7 +3,6 @@
  * Provides strict type safety, runtime validation, and immutable block definitions
  */
 
-
 // ---------------------------------------------------------------------------
 // Type Definitions
 // ---------------------------------------------------------------------------
@@ -782,11 +781,11 @@ if (typeof Object.freeze === "function") {
 // ---------------------------------------------------------------------------
 
 /**
- * Register core block types that are always available
+ * Register all block types including core and assignment operations
  */
-function registerCoreBlocks(): void {
+function registerAllBlocks(): void {
   try {
-    // Data blocks
+    // Core Data blocks
     BlockRegistry.register("variable", {
       displayName: "Variable",
       category: "data",
@@ -807,6 +806,59 @@ function registerCoreBlocks(): void {
       }),
     });
 
+    // Assignment Operations
+    BlockRegistry.register("set_variable", {
+      displayName: "Set Variable",
+      category: "data",
+      inputs: ["target", "value"],
+      outputs: ["result"],
+      defaultProps: { name: "myVar" },
+      description: "Assigns a value to a variable",
+      execute: async (ctx) => {
+        const name = ctx.inputs.name || ctx.inputs.target || "variable";
+        const value = ctx.inputs.value ?? null;
+        
+        // Store in global state for access by other blocks
+        const globalState = ctx.state.get("__global__") || new Map();
+        if (!ctx.state.has("__global__")) {
+          ctx.state.set("__global__", globalState);
+        }
+        
+        globalState.set(String(name), value);
+        ctx.setValue("result", value);
+        ctx.log(`Set ${name} = ${JSON.stringify(value)}`);
+        
+        await ctx.go("result", value);
+      },
+      render: (props) => ({
+        label: "SET",
+        content: `${props.name || "var"} = ?`,
+      }),
+    });
+
+    BlockRegistry.register("get_variable", {
+      displayName: "Get Variable",
+      category: "data",
+      inputs: [],
+      outputs: ["value"],
+      defaultProps: { name: "myVar" },
+      description: "Gets the current value of a variable",
+      execute: async (ctx) => {
+        const name = ctx.inputs.name || "variable";
+        const globalState = ctx.state.get("__global__");
+        const value = globalState?.get(String(name)) ?? null;
+        
+        ctx.setValue("value", value);
+        ctx.log(`Get ${name} = ${JSON.stringify(value)}`);
+        
+        await ctx.go("value", value);
+      },
+      render: (props) => ({
+        label: "GET",
+        content: String(props.name || "var"),
+      }),
+    });
+
     BlockRegistry.register("array", {
       displayName: "Array",
       category: "data",
@@ -823,6 +875,219 @@ function registerCoreBlocks(): void {
       render: (props) => ({
         label: "ARRAY",
         content: `[${Array.isArray(props.items) ? props.items.length : 0}]`,
+      }),
+    });
+
+    // Array Operations
+    BlockRegistry.register("array_push", {
+      displayName: "Array Push",
+      category: "data",
+      inputs: ["array", "item"],
+      outputs: ["result"],
+      defaultProps: {},
+      description: "Adds an item to the end of an array",
+      execute: async (ctx) => {
+        const inputArray = ctx.inputs.array;
+        const item = ctx.inputs.item;
+        
+        let resultArray: unknown[];
+        if (Array.isArray(inputArray)) {
+          resultArray = [...inputArray, item];
+        } else {
+          resultArray = [item];
+        }
+        
+        ctx.setValue("result", resultArray);
+        ctx.log(`Pushed ${JSON.stringify(item)} to array (length: ${resultArray.length})`);
+        
+        await ctx.go("result", resultArray);
+      },
+      render: () => ({
+        label: "PUSH",
+        content: "array.push(item)",
+      }),
+    });
+
+    BlockRegistry.register("array_pop", {
+      displayName: "Array Pop",
+      category: "data",
+      inputs: ["array"],
+      outputs: ["array", "item"],
+      defaultProps: {},
+      description: "Removes and returns the last item from an array",
+      execute: async (ctx) => {
+        const inputArray = ctx.inputs.array;
+        
+        if (!Array.isArray(inputArray) || inputArray.length === 0) {
+          ctx.log("Cannot pop from empty or non-array");
+          await ctx.go("array", inputArray);
+          await ctx.go("item", null);
+          return;
+        }
+        
+        const resultArray = [...inputArray];
+        const poppedItem = resultArray.pop();
+        
+        ctx.setValue("array", resultArray);
+        ctx.setValue("item", poppedItem);
+        ctx.log(`Popped ${JSON.stringify(poppedItem)} from array`);
+        
+        await ctx.go("array", resultArray);
+        await ctx.go("item", poppedItem);
+      },
+      render: () => ({
+        label: "POP",
+        content: "array.pop()",
+      }),
+    });
+
+    BlockRegistry.register("array_get", {
+      displayName: "Array Get",
+      category: "data",
+      inputs: ["array", "index"],
+      outputs: ["value"],
+      defaultProps: { index: 0 },
+      description: "Gets an item from an array by index",
+      execute: async (ctx) => {
+        const inputArray = ctx.inputs.array;
+        const index = Number(ctx.inputs.index ?? 0);
+        
+        let value = null;
+        if (Array.isArray(inputArray) && index >= 0 && index < inputArray.length) {
+          value = inputArray[index];
+        }
+        
+        ctx.setValue("value", value);
+        ctx.log(`Get array[${index}] = ${JSON.stringify(value)}`);
+        
+        await ctx.go("value", value);
+      },
+      render: (props) => ({
+        label: "GET",
+        content: `array[${props.index ?? 0}]`,
+      }),
+    });
+
+    BlockRegistry.register("array_set", {
+      displayName: "Array Set",
+      category: "data",
+      inputs: ["array", "index", "value"],
+      outputs: ["result"],
+      defaultProps: { index: 0 },
+      description: "Sets an item in an array by index",
+      execute: async (ctx) => {
+        const inputArray = ctx.inputs.array;
+        const index = Number(ctx.inputs.index ?? 0);
+        const value = ctx.inputs.value;
+        
+        let resultArray: unknown[];
+        if (Array.isArray(inputArray)) {
+          resultArray = [...inputArray];
+          if (index >= 0) {
+            // Extend array if necessary
+            while (resultArray.length <= index) {
+              resultArray.push(null);
+            }
+            resultArray[index] = value;
+          }
+        } else {
+          // Create new array if input wasn't an array
+          resultArray = [];
+          if (index >= 0) {
+            while (resultArray.length <= index) {
+              resultArray.push(null);
+            }
+            resultArray[index] = value;
+          }
+        }
+        
+        ctx.setValue("result", resultArray);
+        ctx.log(`Set array[${index}] = ${JSON.stringify(value)}`);
+        
+        await ctx.go("result", resultArray);
+      },
+      render: (props) => ({
+        label: "SET",
+        content: `array[${props.index ?? 0}] = ?`,
+      }),
+    });
+
+    // Object Operations
+    BlockRegistry.register("object", {
+      displayName: "Object",
+      category: "data",
+      inputs: [],
+      outputs: ["object"],
+      defaultProps: { properties: {} },
+      description: "Creates an object with properties",
+      execute: async (ctx) => {
+        const properties = ctx.inputs.properties ?? {};
+        ctx.setValue("object", properties);
+        ctx.log(`Object created with ${Object.keys(properties).length} properties`);
+        await ctx.go("object", properties);
+      },
+      render: (props) => ({
+        label: "OBJ",
+        content: `{${Object.keys(props.properties || {}).length}}`,
+      }),
+    });
+
+    BlockRegistry.register("object_get", {
+      displayName: "Object Get",
+      category: "data",
+      inputs: ["object", "key"],
+      outputs: ["value"],
+      defaultProps: { key: "property" },
+      description: "Gets a property value from an object",
+      execute: async (ctx) => {
+        const inputObject = ctx.inputs.object;
+        const key = String(ctx.inputs.key ?? "property");
+        
+        let value = null;
+        if (inputObject && typeof inputObject === "object" && !Array.isArray(inputObject)) {
+          value = (inputObject as Record<string, unknown>)[key];
+        }
+        
+        ctx.setValue("value", value);
+        ctx.log(`Get object.${key} = ${JSON.stringify(value)}`);
+        
+        await ctx.go("value", value);
+      },
+      render: (props) => ({
+        label: "GET",
+        content: `obj.${props.key || "prop"}`,
+      }),
+    });
+
+    BlockRegistry.register("object_set", {
+      displayName: "Object Set",
+      category: "data",
+      inputs: ["object", "key", "value"],
+      outputs: ["result"],
+      defaultProps: { key: "property" },
+      description: "Sets a property value on an object",
+      execute: async (ctx) => {
+        const inputObject = ctx.inputs.object;
+        const key = String(ctx.inputs.key ?? "property");
+        const value = ctx.inputs.value;
+        
+        let resultObject: Record<string, unknown>;
+        if (inputObject && typeof inputObject === "object" && !Array.isArray(inputObject)) {
+          resultObject = { ...(inputObject as Record<string, unknown>) };
+        } else {
+          resultObject = {};
+        }
+        
+        resultObject[key] = value;
+        
+        ctx.setValue("result", resultObject);
+        ctx.log(`Set object.${key} = ${JSON.stringify(value)}`);
+        
+        await ctx.go("result", resultObject);
+      },
+      render: (props) => ({
+        label: "SET",
+        content: `obj.${props.key || "prop"} = ?`,
       }),
     });
 
@@ -851,6 +1116,51 @@ function registerCoreBlocks(): void {
       }),
     });
 
+    BlockRegistry.register("counter_increment", {
+      displayName: "Increment Counter",
+      category: "data",
+      inputs: ["trigger", "step"],
+      outputs: ["count"],
+      defaultProps: { initialValue: 0, step: 1 },
+      description: "Increments a counter each time it receives input",
+      execute: async (ctx) => {
+        const step = Number(ctx.inputs.step ?? ctx.inputs.initialStep ?? 1);
+        const currentCount = (ctx.getValue("count") as number) ?? Number(ctx.inputs.initialValue ?? 0);
+        const newCount = currentCount + step;
+        
+        ctx.setValue("count", newCount);
+        ctx.log(`Counter: ${currentCount} + ${step} = ${newCount}`);
+        
+        await ctx.go("count", newCount);
+      },
+      render: (props) => ({
+        label: "INC",
+        content: `+${props.step ?? 1}`,
+        value: String(props.initialValue ?? 0),
+      }),
+    });
+
+    BlockRegistry.register("counter_reset", {
+      displayName: "Reset Counter",
+      category: "data",
+      inputs: ["trigger"],
+      outputs: ["count"],
+      defaultProps: { value: 0 },
+      description: "Resets a counter to a specific value",
+      execute: async (ctx) => {
+        const resetValue = Number(ctx.inputs.value ?? 0);
+        
+        ctx.setValue("count", resetValue);
+        ctx.log(`Counter reset to ${resetValue}`);
+        
+        await ctx.go("count", resetValue);
+      },
+      render: (props) => ({
+        label: "RESET",
+        content: `reset to ${props.value ?? 0}`,
+      }),
+    });
+
     // Control flow blocks
     BlockRegistry.register("function", {
       displayName: "Function",
@@ -868,6 +1178,54 @@ function registerCoreBlocks(): void {
       render: (props) => ({
         label: "FN",
         content: String(props.name || "function"),
+      }),
+    });
+
+    BlockRegistry.register("if", {
+      displayName: "If",
+      category: "control",
+      inputs: ["condition"],
+      outputs: ["true", "false"],
+      defaultProps: { condition: true },
+      description: "Conditional branching",
+      execute: async (ctx) => {
+        const condition = ctx.inputs.condition;
+        ctx.log(`If condition: ${!!condition}`);
+        
+        if (condition) {
+          await ctx.go("true", condition);
+        } else {
+          await ctx.go("false", condition);
+        }
+      },
+      render: (props) => ({
+        label: "IF",
+        content: `condition: ${!!props.condition}`,
+      }),
+    });
+
+    BlockRegistry.register("if_assign", {
+      displayName: "If Assign",
+      category: "control",
+      inputs: ["condition", "trueValue", "falseValue"],
+      outputs: ["result"],
+      defaultProps: {},
+      description: "Assigns different values based on condition",
+      execute: async (ctx) => {
+        const condition = ctx.inputs.condition;
+        const trueValue = ctx.inputs.trueValue;
+        const falseValue = ctx.inputs.falseValue;
+        
+        const result = condition ? trueValue : falseValue;
+        
+        ctx.setValue("result", result);
+        ctx.log(`If assign: condition=${!!condition}, result=${JSON.stringify(result)}`);
+        
+        await ctx.go("result", result);
+      },
+      render: () => ({
+        label: "IF=",
+        content: "condition ? a : b",
       }),
     });
 
@@ -899,6 +1257,136 @@ function registerCoreBlocks(): void {
       }),
     });
 
+    BlockRegistry.register("while_loop", {
+      displayName: "While Loop",
+      category: "control",
+      inputs: ["condition"],
+      outputs: ["body", "done"],
+      defaultProps: { maxIterations: 100 },
+      description: "Loops while condition is true",
+      execute: async (ctx) => {
+        const maxIterations = Number(ctx.inputs.maxIterations ?? 100);
+        let iterations = 0;
+        
+        while (iterations < maxIterations) {
+          const condition = ctx.inputs.condition;
+          
+          // Simple truthiness check
+          if (!condition) {
+            break;
+          }
+          
+          iterations++;
+          ctx.log(`While loop iteration ${iterations}`);
+          
+          // Execute body
+          await ctx.go("body", { iteration: iterations, condition });
+          
+          // Safety check to prevent infinite loops
+          if (iterations >= maxIterations) {
+            ctx.log(`While loop terminated after ${maxIterations} iterations (safety limit)`);
+            break;
+          }
+        }
+        
+        ctx.log(`While loop completed after ${iterations} iterations`);
+        await ctx.go("done", { iterations });
+      },
+      render: (props) => ({
+        label: "WHILE",
+        content: `max: ${props.maxIterations ?? 100}`,
+      }),
+    });
+
+    BlockRegistry.register("for_range", {
+      displayName: "For Range",
+      category: "control",
+      inputs: ["start", "end", "step"],
+      outputs: ["body", "done"],
+      defaultProps: { start: 0, end: 10, step: 1 },
+      description: "Loops from start to end with step",
+      execute: async (ctx) => {
+        const start = Number(ctx.inputs.start ?? 0);
+        const end = Number(ctx.inputs.end ?? 10);
+        const step = Number(ctx.inputs.step ?? 1);
+        
+        if (step === 0) {
+          ctx.log("Step cannot be zero");
+          await ctx.go("done", { error: "Invalid step value" });
+          return;
+        }
+        
+        let current = start;
+        let iterations = 0;
+        const maxIterations = 1000; // Safety limit
+        
+        if (step > 0) {
+          while (current < end && iterations < maxIterations) {
+            iterations++;
+            ctx.log(`For loop iteration ${iterations}: i = ${current}`);
+            
+            await ctx.go("body", { index: current, iteration: iterations });
+            current += step;
+          }
+        } else {
+          while (current > end && iterations < maxIterations) {
+            iterations++;
+            ctx.log(`For loop iteration ${iterations}: i = ${current}`);
+            
+            await ctx.go("body", { index: current, iteration: iterations });
+            current += step;
+          }
+        }
+        
+        ctx.log(`For loop completed after ${iterations} iterations`);
+        await ctx.go("done", { iterations, finalValue: current });
+      },
+      render: (props) => ({
+        label: "FOR",
+        content: `${props.start ?? 0}..${props.end ?? 10}`,
+      }),
+    });
+
+    BlockRegistry.register("return", {
+      displayName: "Return",
+      category: "control",
+      inputs: ["value"],
+      outputs: [],
+      defaultProps: { value: null },
+      description: "Returns a value from function",
+      execute: async (ctx) => {
+        const value = ctx.inputs.value;
+        ctx.log(`Return: ${JSON.stringify(value)}`);
+        ctx.setValue("return", value);
+      },
+      render: (props) => ({
+        label: "RETURN",
+        content: String(props.value ?? "null"),
+      }),
+    });
+
+    BlockRegistry.register("delay", {
+      displayName: "Delay",
+      category: "control",
+      inputs: ["trigger"],
+      outputs: ["done"],
+      defaultProps: { ms: 1000 },
+      description: "Delays execution for specified time",
+      execute: async (ctx) => {
+        const ms = Number(ctx.inputs.ms ?? 1000);
+        ctx.log(`Delaying for ${ms}ms`);
+        
+        await new Promise(resolve => setTimeout(resolve, ms));
+        
+        ctx.log(`Delay completed`);
+        await ctx.go("done", true);
+      },
+      render: (props) => ({
+        label: "DELAY",
+        content: `${props.ms ?? 1000}ms`,
+      }),
+    });
+
     // Math blocks
     BlockRegistry.register("add", {
       displayName: "Add",
@@ -922,6 +1410,301 @@ function registerCoreBlocks(): void {
       }),
     });
 
+    BlockRegistry.register("add_assign", {
+      displayName: "Add Assign",
+      category: "math",
+      inputs: ["target", "value"],
+      outputs: ["result"],
+      defaultProps: {},
+      description: "Adds value to target (target += value)",
+      execute: async (ctx) => {
+        const target = Number(ctx.inputs.target ?? 0);
+        const value = Number(ctx.inputs.value ?? 0);
+        const result = target + value;
+        
+        ctx.setValue("result", result);
+        ctx.log(`Add assign: ${target} += ${value} = ${result}`);
+        
+        await ctx.go("result", result);
+      },
+      render: () => ({
+        label: "+=",
+        content: "target += value",
+      }),
+    });
+
+    BlockRegistry.register("subtract", {
+      displayName: "Subtract",
+      category: "math",
+      inputs: ["a", "b"],
+      outputs: ["difference"],
+      defaultProps: { a: 0, b: 0 },
+      description: "Subtracts two numbers",
+      execute: async (ctx) => {
+        const a = Number(ctx.inputs.a ?? 0);
+        const b = Number(ctx.inputs.b ?? 0);
+        const difference = a - b;
+
+        ctx.setValue("result", difference);
+        ctx.log(`${a} - ${b} = ${difference}`);
+        await ctx.go("difference", difference);
+      },
+      render: (props) => ({
+        label: "SUB",
+        content: `${props.a ?? 0} - ${props.b ?? 0}`,
+      }),
+    });
+
+    BlockRegistry.register("multiply", {
+      displayName: "Multiply",
+      category: "math",
+      inputs: ["a", "b"],
+      outputs: ["product"],
+      defaultProps: { a: 1, b: 1 },
+      description: "Multiplies two numbers",
+      execute: async (ctx) => {
+        const a = Number(ctx.inputs.a ?? 1);
+        const b = Number(ctx.inputs.b ?? 1);
+        const product = a * b;
+
+        ctx.setValue("result", product);
+        ctx.log(`${a} × ${b} = ${product}`);
+        await ctx.go("product", product);
+      },
+      render: (props) => ({
+        label: "MUL",
+        content: `${props.a ?? 1} × ${props.b ?? 1}`,
+      }),
+    });
+
+    BlockRegistry.register("multiply_assign", {
+      displayName: "Multiply Assign",
+      category: "math",
+      inputs: ["target", "value"],
+      outputs: ["result"],
+      defaultProps: {},
+      description: "Multiplies target by value (target *= value)",
+      execute: async (ctx) => {
+        const target = Number(ctx.inputs.target ?? 1);
+        const value = Number(ctx.inputs.value ?? 1);
+        const result = target * value;
+        
+        ctx.setValue("result", result);
+        ctx.log(`Multiply assign: ${target} *= ${value} = ${result}`);
+        
+        await ctx.go("result", result);
+      },
+      render: () => ({
+        label: "*=",
+        content: "target *= value",
+      }),
+    });
+
+    BlockRegistry.register("divide", {
+      displayName: "Divide",
+      category: "math",
+      inputs: ["a", "b"],
+      outputs: ["quotient"],
+      defaultProps: { a: 1, b: 1 },
+      description: "Divides two numbers",
+      execute: async (ctx) => {
+        const a = Number(ctx.inputs.a ?? 1);
+        const b = Number(ctx.inputs.b ?? 1);
+        
+        if (b === 0) {
+          ctx.log("Cannot divide by zero");
+          await ctx.go("quotient", Infinity);
+          return;
+        }
+        
+        const quotient = a / b;
+        ctx.setValue("result", quotient);
+        ctx.log(`${a} ÷ ${b} = ${quotient}`);
+        await ctx.go("quotient", quotient);
+      },
+      render: (props) => ({
+        label: "DIV",
+        content: `${props.a ?? 1} ÷ ${props.b ?? 1}`,
+      }),
+    });
+
+    BlockRegistry.register("modulo", {
+      displayName: "Modulo",
+      category: "math",
+      inputs: ["a", "b"],
+      outputs: ["remainder"],
+      defaultProps: { a: 10, b: 3 },
+      description: "Returns remainder of division",
+      execute: async (ctx) => {
+        const a = Number(ctx.inputs.a ?? 10);
+        const b = Number(ctx.inputs.b ?? 3);
+        
+        if (b === 0) {
+          ctx.log("Cannot modulo by zero");
+          await ctx.go("remainder", NaN);
+          return;
+        }
+        
+        const remainder = a % b;
+        ctx.setValue("result", remainder);
+        ctx.log(`${a} % ${b} = ${remainder}`);
+        await ctx.go("remainder", remainder);
+      },
+      render: (props) => ({
+        label: "MOD",
+        content: `${props.a ?? 10} % ${props.b ?? 3}`,
+      }),
+    });
+
+    // Logic blocks
+    BlockRegistry.register("compare", {
+      displayName: "Compare",
+      category: "logic",
+      inputs: ["a", "b"],
+      outputs: ["result"],
+      defaultProps: { operator: "==" },
+      description: "Compares two values",
+      execute: async (ctx) => {
+        const a = ctx.inputs.a;
+        const b = ctx.inputs.b;
+        const operator = ctx.inputs.operator || "==";
+        
+        let result = false;
+        switch (operator) {
+          case "==": result = a == b; break;
+          case "===": result = a === b; break;
+          case "!=": result = a != b; break;
+          case "!==": result = a !== b; break;
+          case "<": result = Number(a) < Number(b); break;
+          case "<=": result = Number(a) <= Number(b); break;
+          case ">": result = Number(a) > Number(b); break;
+          case ">=": result = Number(a) >= Number(b); break;
+          default: result = false;
+        }
+        
+        ctx.setValue("result", result);
+        ctx.log(`${JSON.stringify(a)} ${operator} ${JSON.stringify(b)} = ${result}`);
+        await ctx.go("result", result);
+      },
+      render: (props) => ({
+        label: "CMP",
+        content: `a ${props.operator || "=="} b`,
+      }),
+    });
+
+    BlockRegistry.register("and", {
+      displayName: "AND",
+      category: "logic",
+      inputs: ["a", "b"],
+      outputs: ["result"],
+      defaultProps: {},
+      description: "Logical AND operation",
+      execute: async (ctx) => {
+        const a = ctx.inputs.a;
+        const b = ctx.inputs.b;
+        const result = !!(a && b);
+        
+        ctx.setValue("result", result);
+        ctx.log(`${!!a} AND ${!!b} = ${result}`);
+        await ctx.go("result", result);
+      },
+      render: () => ({
+        label: "AND",
+        content: "a && b",
+      }),
+    });
+
+    BlockRegistry.register("or", {
+      displayName: "OR",
+      category: "logic",
+      inputs: ["a", "b"],
+      outputs: ["result"],
+      defaultProps: {},
+      description: "Logical OR operation",
+      execute: async (ctx) => {
+        const a = ctx.inputs.a;
+        const b = ctx.inputs.b;
+        const result = !!(a || b);
+        
+        ctx.setValue("result", result);
+        ctx.log(`${!!a} OR ${!!b} = ${result}`);
+        await ctx.go("result", result);
+      },
+      render: () => ({
+        label: "OR",
+        content: "a || b",
+      }),
+    });
+
+    BlockRegistry.register("not", {
+      displayName: "NOT",
+      category: "logic",
+      inputs: ["value"],
+      outputs: ["result"],
+      defaultProps: {},
+      description: "Logical NOT operation",
+      execute: async (ctx) => {
+        const value = ctx.inputs.value;
+        const result = !value;
+        
+        ctx.setValue("result", result);
+        ctx.log(`NOT ${!!value} = ${result}`);
+        await ctx.go("result", result);
+      },
+      render: () => ({
+        label: "NOT",
+        content: "!value",
+      }),
+    });
+
+    BlockRegistry.register("random", {
+      displayName: "Random",
+      category: "math",
+      inputs: ["min", "max"],
+      outputs: ["value"],
+      defaultProps: { min: 0, max: 100 },
+      description: "Generates random number",
+      execute: async (ctx) => {
+        const min = Number(ctx.inputs.min ?? 0);
+        const max = Number(ctx.inputs.max ?? 100);
+        const value = Math.floor(Math.random() * (max - min + 1)) + min;
+        
+        ctx.setValue("result", value);
+        ctx.log(`Random(${min}, ${max}) = ${value}`);
+        await ctx.go("value", value);
+      },
+      render: (props) => ({
+        label: "RND",
+        content: `${props.min ?? 0}-${props.max ?? 100}`,
+      }),
+    });
+
+    // String operations
+    BlockRegistry.register("string_concat", {
+      displayName: "String Concat",
+      category: "data",
+      inputs: ["left", "right"],
+      outputs: ["result"],
+      defaultProps: { separator: "" },
+      description: "Concatenates two strings",
+      execute: async (ctx) => {
+        const left = String(ctx.inputs.left ?? "");
+        const right = String(ctx.inputs.right ?? "");
+        const separator = String(ctx.inputs.separator ?? "");
+        
+        const result = left + separator + right;
+        
+        ctx.setValue("result", result);
+        ctx.log(`Concat: "${left}" + "${separator}" + "${right}" = "${result}"`);
+        
+        await ctx.go("result", result);
+      },
+      render: (props) => ({
+        label: "CONCAT",
+        content: `"${props.separator || ''}"`,
+      }),
+    });
+
     // I/O blocks
     BlockRegistry.register("print", {
       displayName: "Print",
@@ -941,11 +1724,50 @@ function registerCoreBlocks(): void {
       }),
     });
 
-    console.log("Core blocks registered successfully");
+    BlockRegistry.register("prompt", {
+      displayName: "Input",
+      category: "io",
+      inputs: ["prompt"],
+      outputs: ["value"],
+      defaultProps: { prompt: "Enter value:" },
+      description: "Gets user input",
+      execute: async (ctx) => {
+        const promptText = String(ctx.inputs.prompt ?? "Enter value:");
+        const value = prompt(promptText) || "";
+        
+        ctx.setValue("result", value);
+        ctx.log(`Input: "${value}"`);
+        await ctx.go("value", value);
+      },
+      render: (props) => ({
+        label: "INPUT",
+        content: String(props.prompt || "input"),
+      }),
+    });
+
+    // Utility blocks
+    BlockRegistry.register("comment", {
+      displayName: "Comment",
+      category: "data",
+      inputs: [],
+      outputs: [],
+      defaultProps: { text: "Comment..." },
+      description: "Documentation comment block",
+      execute: async (ctx) => {
+        const text = ctx.inputs.text ?? "Comment";
+        ctx.log(`Comment: ${text}`);
+      },
+      render: (props) => ({
+        label: "//",
+        content: String(props.text || "Comment..."),
+      }),
+    });
+
+    console.log("All blocks registered successfully");
   } catch (error) {
-    console.error("Failed to register core blocks:", error);
+    console.error("Failed to register blocks:", error);
   }
 }
 
-// Register core blocks on module load
-registerCoreBlocks();
+// Register all blocks on module load
+registerAllBlocks();

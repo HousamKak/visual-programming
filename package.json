@@ -1,7 +1,7 @@
 {
   "name": "visual-programming-framework",
   "version": "2.0.0",
-  "description": "An  modular visual programming framework with assignment operations and inline editing",
+  "description": "A modular visual programming framework with assignment operations and inline editing",
   "type": "module",
   "main": "src/main.ts",
   "scripts": {
@@ -22,7 +22,11 @@
     "assignment-operations",
     "inline-editing",
     "educational",
-    "code-blocks"
+    "code-blocks",
+    "array-manipulation",
+    "object-properties",
+    "loops",
+    "variables"
   ],
   "author": "Visual Programming Team",
   "license": "MIT",
@@ -44,12 +48,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/enhanced-visual-programming-framework.git"
+    "url": "https://github.com/your-org/visual-programming-framework.git"
   },
   "bugs": {
-    "url": "https://github.com/your-org/enhanced-visual-programming-framework/issues"
+    "url": "https://github.com/your-org/visual-programming-framework/issues"
   },
-  "homepage": "https://github.com/your-org/enhanced-visual-programming-framework#readme",
+  "homepage": "https://github.com/your-org/visual-programming-framework#readme",
   "files": [
     "src/**/*",
     "dist/**/*",
@@ -61,8 +65,8 @@
   ],
   "exports": {
     ".": {
-      "import": "./dist/enhanced-main.js",
-      "types": "./dist/enhanced-main.d.ts"
+      "import": "./dist/main.js",
+      "types": "./dist/main.d.ts"
     },
     "./core/*": {
       "import": "./dist/core/*.js",
@@ -93,7 +97,16 @@
     "context-menus": "2.0.0",
     "property-editing": "2.0.0",
     "keyboard-shortcuts": "2.0.0",
-    "quick-add": "2.0.0"
+    "quick-add": "2.0.0",
+    "variable-assignment": "2.0.0",
+    "while-loops": "2.0.0",
+    "for-range-loops": "2.0.0",
+    "conditional-assignment": "2.0.0",
+    "string-concatenation": "2.0.0",
+    "counter-operations": "2.0.0",
+    "dual-view-modes": "2.0.0",
+    "undo-redo": "2.0.0",
+    "auto-save": "2.0.0"
   },
   "config": {
     "maxElements": 1000,

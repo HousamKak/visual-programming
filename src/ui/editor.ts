@@ -1,5 +1,5 @@
 /**
- * Editor - Handles drag & drop, connections, and user interactions
+ * Editor - Handles drag & drop, connections, user interactions, and inline editing
  * Main UI logic for the visual programming interface with comprehensive error handling
  */
 
@@ -21,6 +21,7 @@ export interface EditorOptions {
   readonly enableKeyboardShortcuts?: boolean;
   readonly enableAutoSave?: boolean;
   readonly autoSaveInterval?: number;
+  readonly enableInlineEditing?: boolean;
   readonly onElementAdded?: (element: ElementData) => void;
   readonly onElementRemoved?: (elementId: string) => void;
   readonly onConnectionAdded?: (connection: ConnectionData) => void;
@@ -28,6 +29,7 @@ export interface EditorOptions {
   readonly onStatusUpdate?: (message: string, type?: 'success' | 'error' | 'running') => void;
   readonly onSelectionChanged?: (elementId: string | null) => void;
   readonly onCanvasChanged?: () => void;
+  readonly onPropertyChanged?: (elementId: string, property: string, value: unknown) => void;
 }
 
 interface DragState {
@@ -125,7 +127,6 @@ function validateCoordinates(x: unknown, y: unknown): void {
   }
 }
 
-
 /**
  * Sanitizes props object
  */
@@ -164,7 +165,7 @@ function sanitizeProps(props: unknown): Record<string, unknown> {
 
 /**
  * Editor handles all user interactions for the visual programming interface
- * with comprehensive error handling and resource management
+ * with comprehensive error handling and inline editing capabilities
  */
 export class Editor {
   private readonly renderer: Renderer;
@@ -190,6 +191,7 @@ export class Editor {
   private autoSaveTimer?: number;
   private isDisposed = false;
   private eventAbortController?: AbortController;
+  private currentEditingElement?: HTMLElement;
 
   /**
    * Creates a new Editor instance
@@ -206,6 +208,7 @@ export class Editor {
       maxConnections: 2000,
       enableKeyboardShortcuts: true,
       enableAutoSave: true,
+      enableInlineEditing: true,
       autoSaveInterval: 30000,
       ...options
     };
@@ -720,6 +723,559 @@ export class Editor {
   }
 
   // ---------------------------------------------------------------------------
+  // Inline Editing Methods
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Open inline editor for an element
+   */
+  private openElementEditor(element: HTMLElement): void {
+    if (!this.options.enableInlineEditing) return;
+    
+    const elementId = element.dataset.elementId;
+    if (!elementId) return;
+
+    const elementData = this.elements.get(elementId);
+    if (!elementData) return;
+
+    const definition = BlockRegistry.get(elementData.type);
+    if (!definition) return;
+
+    this.currentEditingElement = element;
+    this.showInlineEditor(element, elementData, definition);
+  }
+
+  /**
+   * Show inline editor overlay
+   */
+  private showInlineEditor(element: HTMLElement, elementData: ElementData, definition: any): void {
+    // Remove any existing editor
+    this.hideInlineEditor();
+
+    const rect = element.getBoundingClientRect();
+    const editor = document.createElement('div');
+    editor.className = 'inline-element-editor';
+    editor.style.cssText = `
+      position: fixed;
+      left: ${rect.left}px;
+      top: ${rect.bottom + 5}px;
+      background: var(--bg-card, rgba(15, 15, 25, 0.95));
+      border: 2px solid var(--primary-blue, #00d4ff);
+      border-radius: 8px;
+      padding: 12px;
+      z-index: 1000;
+      min-width: 200px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    `;
+
+    // Create form for editing properties
+    const form = document.createElement('form');
+    form.innerHTML = `
+      <div style="font-size: 12px; font-weight: 600; color: var(--primary-blue, #00d4ff); margin-bottom: 8px;">
+        Edit ${definition.displayName}
+      </div>
+    `;
+
+    // Add input fields for editable properties
+    const editableProps = this.getEditableProperties(definition, elementData);
+    
+    for (const [key, propInfo] of Object.entries(editableProps)) {
+      const fieldContainer = document.createElement('div');
+      fieldContainer.style.marginBottom = '8px';
+
+      const label = document.createElement('label');
+      label.textContent = propInfo.label;
+      label.style.cssText = `
+        display: block;
+        font-size: 11px;
+        color: var(--text-secondary, #a1a1aa);
+        margin-bottom: 2px;
+      `;
+
+      const input = this.createInputForProperty(key, propInfo, elementData.props[key]);
+      input.style.cssText = `
+        width: 100%;
+        padding: 4px 8px;
+        border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.1));
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-primary, #ffffff);
+        font-size: 12px;
+      `;
+
+      fieldContainer.appendChild(label);
+      fieldContainer.appendChild(input);
+      form.appendChild(fieldContainer);
+    }
+
+    // Add buttons
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    `;
+
+    const saveButton = document.createElement('button');
+    saveButton.textContent = 'Save';
+    saveButton.type = 'submit';
+    saveButton.style.cssText = `
+      background: var(--accent-green, #10b981);
+      color: #000;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      flex: 1;
+    `;
+
+    const cancelButton = document.createElement('button');
+    cancelButton.textContent = 'Cancel';
+    cancelButton.type = 'button';
+    cancelButton.style.cssText = `
+      background: var(--accent-red, #ef4444);
+      color: #fff;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      flex: 1;
+    `;
+
+    buttonContainer.appendChild(saveButton);
+    buttonContainer.appendChild(cancelButton);
+    form.appendChild(buttonContainer);
+
+    // Handle form submission
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.saveElementChanges(elementData, form);
+    });
+
+    cancelButton.addEventListener('click', () => {
+      this.hideInlineEditor();
+    });
+
+    editor.appendChild(form);
+    document.body.appendChild(editor);
+
+    // Focus first input
+    const firstInput = form.querySelector('input, select, textarea') as HTMLElement;
+    firstInput?.focus();
+  }
+
+  /**
+   * Get editable properties for a block type
+   */
+  private getEditableProperties(definition: any, elementData: ElementData): Record<string, any> {
+    const props: Record<string, any> = {};
+
+    // Common editable properties based on block type
+    switch (elementData.type) {
+      case 'variable':
+        props.name = { label: 'Variable Name', type: 'text' };
+        props.value = { label: 'Initial Value', type: 'text' };
+        break;
+      
+      case 'set_variable':
+        props.name = { label: 'Variable Name', type: 'text' };
+        break;
+        
+      case 'get_variable':
+        props.name = { label: 'Variable Name', type: 'text' };
+        break;
+      
+      case 'array':
+        props.items = { label: 'Items (JSON)', type: 'textarea' };
+        break;
+        
+      case 'array_get':
+      case 'array_set':
+        props.index = { label: 'Index', type: 'number' };
+        break;
+        
+      case 'object_get':
+      case 'object_set':
+        props.key = { label: 'Property Key', type: 'text' };
+        break;
+        
+      case 'counter':
+        props.value = { label: 'Initial Value', type: 'number' };
+        props.step = { label: 'Step', type: 'number' };
+        break;
+        
+      case 'counter_increment':
+        props.step = { label: 'Step', type: 'number' };
+        props.initialValue = { label: 'Initial Value', type: 'number' };
+        break;
+        
+      case 'counter_reset':
+        props.value = { label: 'Reset Value', type: 'number' };
+        break;
+        
+      case 'function':
+        props.name = { label: 'Function Name', type: 'text' };
+        props.params = { label: 'Parameters', type: 'text' };
+        break;
+        
+      case 'loop':
+        props.count = { label: 'Loop Count', type: 'number' };
+        break;
+        
+      case 'while_loop':
+        props.maxIterations = { label: 'Max Iterations', type: 'number' };
+        break;
+        
+      case 'for_range':
+        props.start = { label: 'Start', type: 'number' };
+        props.end = { label: 'End', type: 'number' };
+        props.step = { label: 'Step', type: 'number' };
+        break;
+        
+      case 'add':
+      case 'multiply':
+        props.a = { label: 'First Value', type: 'number' };
+        props.b = { label: 'Second Value', type: 'number' };
+        break;
+        
+      case 'print':
+        props.message = { label: 'Message', type: 'text' };
+        break;
+        
+      case 'if':
+        props.condition = { label: 'Condition', type: 'text' };
+        break;
+        
+      case 'string_concat':
+        props.separator = { label: 'Separator', type: 'text' };
+        break;
+        
+      case 'comment':
+        props.text = { label: 'Comment Text', type: 'textarea' };
+        break;
+        
+      default:
+        // Generic handling for custom blocks
+        if (definition.defaultProps) {
+          for (const [key, value] of Object.entries(definition.defaultProps)) {
+            if (typeof value === 'string') {
+              props[key] = { label: this.formatLabel(key), type: 'text' };
+            } else if (typeof value === 'number') {
+              props[key] = { label: this.formatLabel(key), type: 'number' };
+            } else if (typeof value === 'boolean') {
+              props[key] = { label: this.formatLabel(key), type: 'checkbox' };
+            }
+          }
+        }
+    }
+
+    return props;
+  }
+
+  /**
+   * Create appropriate input element for property type
+   */
+  private createInputForProperty(key: string, propInfo: any, currentValue: unknown): HTMLElement {
+    switch (propInfo.type) {
+      case 'number':
+        const numberInput = document.createElement('input');
+        numberInput.type = 'number';
+        numberInput.name = key;
+        numberInput.value = String(currentValue ?? '');
+        return numberInput;
+        
+      case 'checkbox':
+        const checkboxInput = document.createElement('input');
+        checkboxInput.type = 'checkbox';
+        checkboxInput.name = key;
+        checkboxInput.checked = Boolean(currentValue);
+        return checkboxInput;
+        
+      case 'textarea':
+        const textarea = document.createElement('textarea');
+        textarea.name = key;
+        textarea.rows = 3;
+        if (Array.isArray(currentValue)) {
+          textarea.value = JSON.stringify(currentValue, null, 2);
+        } else {
+          textarea.value = String(currentValue ?? '');
+        }
+        return textarea;
+        
+      case 'select':
+        const select = document.createElement('select');
+        select.name = key;
+        // Add options based on propInfo.options if available
+        if (propInfo.options) {
+          for (const option of propInfo.options) {
+            const optionEl = document.createElement('option');
+            optionEl.value = option.value;
+            optionEl.textContent = option.label;
+            optionEl.selected = option.value === currentValue;
+            select.appendChild(optionEl);
+          }
+        }
+        return select;
+        
+      default: // text
+        const textInput = document.createElement('input');
+        textInput.type = 'text';
+        textInput.name = key;
+        textInput.value = String(currentValue ?? '');
+        return textInput;
+    }
+  }
+
+  /**
+   * Save changes made in the inline editor
+   */
+  private saveElementChanges(elementData: ElementData, form: HTMLFormElement): void {
+    const formData = new FormData(form);
+    const updatedProps: Record<string, unknown> = { ...elementData.props };
+
+    for (const [key, value] of formData.entries()) {
+      const input = form.querySelector(`[name="${key}"]`) as HTMLInputElement;
+      
+      if (input.type === 'number') {
+        updatedProps[key] = parseFloat(value as string) || 0;
+      } else if (input.type === 'checkbox') {
+        updatedProps[key] = (input as HTMLInputElement).checked;
+      } else if (input.tagName === 'TEXTAREA' && key === 'items') {
+        // Special handling for array items
+        try {
+          updatedProps[key] = JSON.parse(value as string);
+        } catch {
+          updatedProps[key] = value.toString().split(',').map(s => s.trim());
+        }
+      } else {
+        updatedProps[key] = value;
+      }
+    }
+
+    // Update element data
+    elementData.props = updatedProps;
+
+    // Re-render the element
+    this.rerenderElement(elementData);
+
+    // Notify about property changes
+    for (const [key, value] of Object.entries(updatedProps)) {
+      this.options.onPropertyChanged?.(elementData.id, key, value);
+    }
+
+    this.hideInlineEditor();
+  }
+
+  /**
+   * Re-render an element with updated properties
+   */
+  private rerenderElement(elementData: ElementData): void {
+    const element = document.querySelector(`[data-element-id="${elementData.id}"]`) as HTMLElement;
+    if (!element) return;
+
+    const definition = BlockRegistry.get(elementData.type);
+    if (!definition || !definition.render) return;
+
+    try {
+      const rendered = definition.render(elementData.props);
+      
+      // Update label
+      const labelEl = element.querySelector('.element-label');
+      if (labelEl) {
+        labelEl.textContent = rendered.label;
+      }
+
+      // Update content
+      const contentEl = element.querySelector('.element-content');
+      if (contentEl) {
+        contentEl.textContent = rendered.content;
+      }
+
+      // Update value if present
+      const valueEl = element.querySelector('.element-value');
+      if (valueEl && rendered.value !== undefined) {
+        valueEl.textContent = rendered.value;
+      }
+
+      // Special handling for array elements
+      if (elementData.type === 'array' && Array.isArray(elementData.props.items)) {
+        this.rerenderArrayContent(contentEl as HTMLElement, elementData.props.items as unknown[]);
+      }
+    } catch (error) {
+      console.warn('Failed to re-render element:', error);
+    }
+  }
+
+  /**
+   * Re-render array content specifically
+   */
+  private rerenderArrayContent(container: HTMLElement, items: unknown[]): void {
+    if (!container) return;
+
+    container.innerHTML = '';
+    container.className = 'element-content array-container';
+
+    const openBracket = document.createElement('span');
+    openBracket.className = 'array-bracket';
+    openBracket.textContent = '[';
+    container.appendChild(openBracket);
+
+    const maxVisible = Math.min(5, items.length);
+    const visibleItems = items.slice(0, maxVisible);
+
+    for (const item of visibleItems) {
+      const itemEl = document.createElement('div');
+      itemEl.className = 'array-item';
+      const itemStr = String(item);
+      itemEl.textContent = itemStr.slice(0, 2);
+      itemEl.title = itemStr.slice(0, 100);
+      container.appendChild(itemEl);
+    }
+
+    if (items.length > maxVisible) {
+      const moreEl = document.createElement('div');
+      moreEl.className = 'array-item';
+      moreEl.textContent = '...';
+      moreEl.title = `${items.length - maxVisible} more items`;
+      container.appendChild(moreEl);
+    }
+
+    const closeBracket = document.createElement('span');
+    closeBracket.className = 'array-bracket';
+    closeBracket.textContent = ']';
+    container.appendChild(closeBracket);
+  }
+
+  /**
+   * Show context menu for element
+   */
+  private showContextMenu(element: HTMLElement, x: number, y: number): void {
+    this.hideContextMenu();
+
+    const menu = document.createElement('div');
+    menu.className = 'element-context-menu';
+    menu.style.cssText = `
+      position: fixed;
+      left: ${x}px;
+      top: ${y}px;
+      background: var(--bg-card, rgba(15, 15, 25, 0.95));
+      border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.1));
+      border-radius: 6px;
+      padding: 4px 0;
+      z-index: 2000;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      min-width: 120px;
+    `;
+
+    const menuItems = [
+      { label: 'Edit Properties', action: () => this.openElementEditor(element) },
+      { label: 'Duplicate', action: () => this.duplicateElement(element) },
+      { label: 'Delete', action: () => this.deleteElement(element) },
+    ];
+
+    for (const item of menuItems) {
+      const menuItem = document.createElement('div');
+      menuItem.textContent = item.label;
+      menuItem.style.cssText = `
+        padding: 6px 12px;
+        cursor: pointer;
+        font-size: 12px;
+        color: var(--text-primary, #ffffff);
+        transition: background 0.1s ease;
+      `;
+
+      menuItem.addEventListener('mouseenter', () => {
+        menuItem.style.background = 'rgba(255, 255, 255, 0.1)';
+      });
+
+      menuItem.addEventListener('mouseleave', () => {
+        menuItem.style.background = 'transparent';
+      });
+
+      menuItem.addEventListener('click', () => {
+        item.action();
+        this.hideContextMenu();
+      });
+
+      menu.appendChild(menuItem);
+    }
+
+    document.body.appendChild(menu);
+  }
+
+  /**
+   * Hide context menu
+   */
+  private hideContextMenu(): void {
+    const menu = document.querySelector('.element-context-menu');
+    if (menu) {
+      menu.remove();
+    }
+  }
+
+  /**
+   * Hide inline editor
+   */
+  private hideInlineEditor(): void {
+    const editor = document.querySelector('.inline-element-editor');
+    if (editor) {
+      editor.remove();
+    }
+    this.currentEditingElement = undefined;
+  }
+
+  /**
+   * Duplicate an element
+   */
+  private duplicateElement(element: HTMLElement): void {
+    const elementId = element.dataset.elementId;
+    if (!elementId) return;
+
+    const elementData = this.elements.get(elementId);
+    if (!elementData) return;
+
+    // Add duplicated element with slight offset
+    try {
+      this.addElement(
+        elementData.type,
+        elementData.x + 20,
+        elementData.y + 20,
+        { ...elementData.props }
+      );
+    } catch (error) {
+      console.warn('Failed to duplicate element:', error);
+    }
+  }
+
+  /**
+   * Delete an element
+   */
+  private deleteElement(element: HTMLElement): void {
+    const elementId = element.dataset.elementId;
+    if (!elementId) return;
+
+    if (confirm('Delete this element and all its connections?')) {
+      this.removeElement(elementId);
+    }
+  }
+
+  /**
+   * Format property name for display
+   */
+  private formatLabel(key: string): string {
+    return key
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .trim();
+  }
+
+  // ---------------------------------------------------------------------------
   // Private Methods
   // ---------------------------------------------------------------------------
 
@@ -743,6 +1299,31 @@ export class Editor {
     this.options.canvas.addEventListener('click', this.handleCanvasClick, { signal });
     this.options.canvas.addEventListener('mousedown', this.handleMouseDown, { signal });
     
+    // Double-click editing
+    if (this.options.enableInlineEditing) {
+      this.options.canvas.addEventListener('dblclick', (e) => {
+        const element = (e.target as Element).closest('.element') as HTMLElement;
+        if (!element || !element.dataset.elementId) return;
+
+        e.preventDefault();
+        this.openElementEditor(element);
+      }, { signal });
+
+      // Context menu
+      this.options.canvas.addEventListener('contextmenu', (e) => {
+        const element = (e.target as Element).closest('.element') as HTMLElement;
+        if (!element || !element.dataset.elementId) return;
+
+        e.preventDefault();
+        this.showContextMenu(element, e.clientX, e.clientY);
+      }, { signal });
+
+      // Hide context menu on click elsewhere
+      document.addEventListener('click', () => {
+        this.hideContextMenu();
+      }, { signal });
+    }
+    
     // Global mouse events for dragging
     document.addEventListener('mousemove', this.handleMouseMove, { signal });
     document.addEventListener('mouseup', this.handleMouseUp, { signal });
@@ -752,8 +1333,10 @@ export class Editor {
       document.addEventListener('keydown', this.handleKeyDown, { signal });
     }
 
-    // Prevent context menu on canvas
-    this.options.canvas.addEventListener('contextmenu', (e) => e.preventDefault(), { signal });
+    // Prevent context menu on canvas (if inline editing disabled)
+    if (!this.options.enableInlineEditing) {
+      this.options.canvas.addEventListener('contextmenu', (e) => e.preventDefault(), { signal });
+    }
   }
 
   /**
@@ -895,6 +1478,8 @@ export class Editor {
         this.toggleConnectMode();
       }
       this.clearConnectionSelection();
+      this.hideInlineEditor();
+      this.hideContextMenu();
     }
     
     if (e.key === 'Delete' && this.dragState.selectedElement) {
