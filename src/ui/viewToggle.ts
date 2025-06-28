@@ -452,7 +452,7 @@ export class ViewToggle {
    */
   private createStylesheet(href: string, id: string): HTMLLinkElement {
     // Check if stylesheet already exists
-    const existing = document.getElementById(id) as HTMLLinkElement;
+    const existing = document.getElementById(id);
     if (existing && existing instanceof HTMLLinkElement) {
       return existing;
     }
