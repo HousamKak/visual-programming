@@ -3,9 +3,14 @@
  * Initializes the visual programming framework with comprehensive error handling
  */
 
-import { Editor, type EditorOptions } from './ui/editor.js';
-import { ViewToggle, createViewToggle, addViewTransitionStyles } from './ui/viewToggle.js';
-import { BlockRegistry } from './core/registry.js';
+import { Editor, type EditorOptions } from "./ui/editor.js";
+import {
+  ViewToggle,
+  createViewToggle,
+  addViewTransitionStyles,
+} from "./ui/viewToggle.js";
+import { BlockRegistry } from "./core/registry.js";
+import type { ElementData, ConnectionData } from "./core/renderer.js";
 
 // ---------------------------------------------------------------------------
 // Type Definitions
@@ -73,9 +78,12 @@ function validateRequiredElement(id: string): HTMLElement {
  * Validates required SVG element
  */
 function validateRequiredSVGElement(id: string): SVGElement {
-  const element = document.getElementById(id) as SVGElement;
-  if (!element || !(element instanceof SVGElement)) {
+  const element = document.getElementById(id);
+  if (!element) {
     throw new Error(`Required SVG element not found: ${id}`);
+  }
+  if (!(element instanceof SVGElement)) {
+    throw new Error(`Element with id "${id}" is not an SVG element`);
   }
   if (!element.isConnected) {
     throw new Error(`Required SVG element not attached to DOM: ${id}`);
@@ -88,14 +96,21 @@ function validateRequiredSVGElement(id: string): SVGElement {
  */
 function validateAppOptions(options: AppOptions): void {
   if (options.autoSaveInterval !== undefined) {
-    if (typeof options.autoSaveInterval !== 'number' || options.autoSaveInterval < 1000) {
-      throw new RangeError('Auto save interval must be at least 1000ms');
+    if (
+      typeof options.autoSaveInterval !== "number" ||
+      options.autoSaveInterval < 1000
+    ) {
+      throw new RangeError("Auto save interval must be at least 1000ms");
     }
   }
 
   if (options.maxUndoSteps !== undefined) {
-    if (typeof options.maxUndoSteps !== 'number' || options.maxUndoSteps < 1 || options.maxUndoSteps > 1000) {
-      throw new RangeError('Max undo steps must be between 1 and 1000');
+    if (
+      typeof options.maxUndoSteps !== "number" ||
+      options.maxUndoSteps < 1 ||
+      options.maxUndoSteps > 1000
+    ) {
+      throw new RangeError("Max undo steps must be between 1 and 1000");
     }
   }
 }
@@ -103,39 +118,49 @@ function validateAppOptions(options: AppOptions): void {
 /**
  * Validates state object for save/load operations
  */
-function validateStateFormat(state: unknown): asserts state is { elements: unknown[]; connections: unknown[] } {
-  if (!state || typeof state !== 'object') {
-    throw new TypeError('State must be an object');
+function validateStateFormat(
+  state: unknown
+): asserts state is { elements: ElementData[]; connections: ConnectionData[] } {
+  if (!state || typeof state !== "object") {
+    throw new TypeError("State must be an object");
   }
 
   const stateObj = state as Record<string, unknown>;
-  
+
   if (!Array.isArray(stateObj.elements)) {
-    throw new TypeError('State must contain elements array');
+    throw new TypeError("State must contain elements array");
   }
-  
+
   if (!Array.isArray(stateObj.connections)) {
-    throw new TypeError('State must contain connections array');
+    throw new TypeError("State must contain connections array");
   }
 
   // Validate elements structure
   for (const [index, element] of stateObj.elements.entries()) {
-    if (!element || typeof element !== 'object') {
+    if (!element || typeof element !== "object") {
       throw new TypeError(`Invalid element at index ${index}`);
     }
-    
+
     const el = element as Record<string, unknown>;
-    if (!el.id || !el.type || typeof el.x !== 'number' || typeof el.y !== 'number') {
+    if (
+      !el.id ||
+      !el.type ||
+      typeof el.x !== "number" ||
+      typeof el.y !== "number"
+    ) {
       throw new TypeError(`Invalid element structure at index ${index}`);
     }
+    if (!el.props || typeof el.props !== "object") {
+      throw new TypeError(`Invalid element props at index ${index}`);
+    }
   }
-  
+
   // Validate connections structure
   for (const [index, connection] of stateObj.connections.entries()) {
-    if (!connection || typeof connection !== 'object') {
+    if (!connection || typeof connection !== "object") {
       throw new TypeError(`Invalid connection at index ${index}`);
     }
-    
+
     const conn = connection as Record<string, unknown>;
     if (!conn.id || !conn.fromId || !conn.toId) {
       throw new TypeError(`Invalid connection structure at index ${index}`);
@@ -148,8 +173,8 @@ function validateStateFormat(state: unknown): asserts state is { elements: unkno
  */
 function sanitizeFilename(filename: string): string {
   return filename
-    .replace(/[<>:"/\\|?*]/g, '')
-    .replace(/\s+/g, '-')
+    .replace(/[<>:"/\\|?*]/g, "")
+    .replace(/\s+/g, "-")
     .slice(0, 100);
 }
 
@@ -191,7 +216,7 @@ class VisualProgrammingApp {
         enableKeyboardShortcuts: true,
         enableExample: true,
         persistViewMode: true,
-        ...options
+        ...options,
       };
 
       // Initialize state
@@ -199,18 +224,18 @@ class VisualProgrammingApp {
         isInitialized: false,
         hasError: false,
         startTime: Date.now(),
-        features: []
+        features: [],
       } as AppState;
 
       this.undoRedoState = {
         undoStack: [],
         redoStack: [],
-        maxStackSize: this.options.maxUndoSteps
+        maxStackSize: this.options.maxUndoSteps,
       } as UndoRedoState;
 
       // Get and validate DOM elements
       this.elements = this.getDOMElements();
-      
+
       // Initialize view toggle first
       this.viewToggle = this.initializeViewToggle();
 
@@ -223,16 +248,19 @@ class VisualProgrammingApp {
 
       // Mark as initialized
       (this.state as any).isInitialized = true;
-      
-      console.log('Visual Programming Framework initialized successfully');
-      console.log('Available block types:', BlockRegistry.getTypes());
-      console.log('Enabled features:', this.state.features);
 
+      console.log("Visual Programming Framework initialized successfully");
+      console.log("Available block types:", BlockRegistry.getTypes());
+      console.log("Enabled features:", this.state.features);
     } catch (error) {
       (this.state as any).hasError = true;
-      (this.state as any).errorMessage = error instanceof Error ? error.message : String(error);
-      
-      console.error('Failed to initialize Visual Programming Framework:', error);
+      (this.state as any).errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      console.error(
+        "Failed to initialize Visual Programming Framework:",
+        error
+      );
       this.showErrorUI(error);
       throw error;
     }
@@ -243,8 +271,8 @@ class VisualProgrammingApp {
    */
   getStats(): Readonly<{
     appState: AppState;
-    editorStats: ReturnType<Editor['getStats']>;
-    viewToggleStats: ReturnType<ViewToggle['getStats']>;
+    editorStats: ReturnType<Editor["getStats"]>;
+    viewToggleStats: ReturnType<ViewToggle["getStats"]>;
     undoRedoStats: { undoAvailable: number; redoAvailable: number };
     registryStats: ReturnType<typeof BlockRegistry.getStats>;
   }> {
@@ -256,9 +284,9 @@ class VisualProgrammingApp {
       viewToggleStats: this.viewToggle.getStats(),
       undoRedoStats: {
         undoAvailable: this.undoRedoState.undoStack.length,
-        redoAvailable: this.undoRedoState.redoStack.length
+        redoAvailable: this.undoRedoState.redoStack.length,
       },
-      registryStats: BlockRegistry.getStats()
+      registryStats: BlockRegistry.getStats(),
     });
   }
 
@@ -286,10 +314,9 @@ class VisualProgrammingApp {
       this.viewToggle?.dispose();
 
       this.isDisposed = true;
-      console.log('Visual Programming Framework disposed');
-
+      console.log("Visual Programming Framework disposed");
     } catch (error) {
-      console.error('Error during app disposal:', error);
+      console.error("Error during app disposal:", error);
     }
   }
 
@@ -302,7 +329,7 @@ class VisualProgrammingApp {
    */
   private checkDisposed(): void {
     if (this.isDisposed) {
-      throw new Error('Application has been disposed');
+      throw new Error("Application has been disposed");
     }
   }
 
@@ -312,18 +339,20 @@ class VisualProgrammingApp {
   private getDOMElements(): AppElements {
     try {
       return {
-        canvas: validateRequiredElement('canvas'),
-        connectionsSvg: validateRequiredSVGElement('connectionsSvg'),
-        toolbar: document.querySelector('.toolbar') as HTMLElement || validateRequiredElement('toolbar'),
-        statusElement: validateRequiredElement('status'),
-        runButton: validateRequiredElement('runCode'),
-        saveButton: validateRequiredElement('saveCode'),
-        loadButton: validateRequiredElement('loadCode'),
-        toggleViewButton: validateRequiredElement('toggleView'),
-        connectModeButton: validateRequiredElement('connectMode'),
-        clearAllButton: validateRequiredElement('clearAll'),
-        elementCountElement: validateRequiredElement('elementCount'),
-        connectionCountElement: validateRequiredElement('connectionCount')
+        canvas: validateRequiredElement("canvas"),
+        connectionsSvg: validateRequiredSVGElement("connectionsSvg"),
+        toolbar:
+          (document.querySelector(".toolbar") as HTMLElement) ||
+          validateRequiredElement("toolbar"),
+        statusElement: validateRequiredElement("status"),
+        runButton: validateRequiredElement("runCode"),
+        saveButton: validateRequiredElement("saveCode"),
+        loadButton: validateRequiredElement("loadCode"),
+        toggleViewButton: validateRequiredElement("toggleView"),
+        connectModeButton: validateRequiredElement("connectMode"),
+        clearAllButton: validateRequiredElement("clearAll"),
+        elementCountElement: validateRequiredElement("elementCount"),
+        connectionCountElement: validateRequiredElement("connectionCount"),
       };
     } catch (error) {
       throw new Error(
@@ -340,26 +369,25 @@ class VisualProgrammingApp {
   private initializeViewToggle(): ViewToggle {
     try {
       addViewTransitionStyles();
-      
+
       const viewToggle = createViewToggle({
         persistState: this.options.persistViewMode,
         onViewChange: (mode) => {
           console.log(`Switched to ${mode} view`);
-          this.updateStatus(`Switched to ${mode} view`, 'success');
-        }
+          this.updateStatus(`Switched to ${mode} view`, "success");
+        },
       });
 
       // Bind toggle button
       viewToggle.bindButton(this.elements.toggleViewButton, {
-        cardText: 'Card View',
-        iconText: 'Icon View',
-        cardIcon: '🎛',
-        iconIcon: '📱'
+        cardText: "Card View",
+        iconText: "Icon View",
+        cardIcon: "🎛",
+        iconIcon: "📱",
       });
 
-      this.state.features.push('View Toggle');
+      this.state.features.push("View Toggle");
       return viewToggle;
-
     } catch (error) {
       throw new Error(
         `Failed to initialize view toggle: ${
@@ -401,13 +429,12 @@ class VisualProgrammingApp {
           this.saveUndoState();
         },
         onStatusUpdate: (message, type) => this.updateStatus(message, type),
-        onCanvasChanged: () => this.saveUndoState()
+        onCanvasChanged: () => this.saveUndoState(),
       };
 
       const editor = new Editor(editorOptions);
-      this.state.features.push('Visual Editor');
+      this.state.features.push("Visual Editor");
       return editor;
-
     } catch (error) {
       throw new Error(
         `Failed to initialize editor: ${
@@ -426,57 +453,86 @@ class VisualProgrammingApp {
 
     try {
       // Toolbar - add elements
-      this.elements.toolbar.addEventListener('click', (e) => {
-        const tool = (e.target as Element).closest('.tool') as HTMLElement;
-        if (!tool?.dataset.type) return;
+      this.elements.toolbar.addEventListener(
+        "click",
+        (e) => {
+          const tool = (e.target as Element).closest(".tool") as HTMLElement;
+          if (!tool?.dataset.type) return;
 
-        try {
-          this.editor.addElement(tool.dataset.type);
-        } catch (error) {
-          this.updateStatus(
-            `Failed to add element: ${error instanceof Error ? error.message : String(error)}`,
-            'error'
-          );
-        }
-      }, { signal });
+          try {
+            this.editor.addElement(tool.dataset.type);
+          } catch (error) {
+            this.updateStatus(
+              `Failed to add element: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+              "error"
+            );
+          }
+        },
+        { signal }
+      );
 
       // Control buttons
-      this.elements.runButton.addEventListener('click', () => {
-        this.executeProgram();
-      }, { signal });
+      this.elements.runButton.addEventListener(
+        "click",
+        () => {
+          this.executeProgram();
+        },
+        { signal }
+      );
 
-      this.elements.saveButton.addEventListener('click', () => {
-        this.saveProgram();
-      }, { signal });
+      this.elements.saveButton.addEventListener(
+        "click",
+        () => {
+          this.saveProgram();
+        },
+        { signal }
+      );
 
-      this.elements.loadButton.addEventListener('click', () => {
-        this.loadProgram();
-      }, { signal });
+      this.elements.loadButton.addEventListener(
+        "click",
+        () => {
+          this.loadProgram();
+        },
+        { signal }
+      );
 
-      this.elements.connectModeButton.addEventListener('click', () => {
-        this.editor.toggleConnectMode();
-        this.elements.connectModeButton.classList.toggle('active');
-      }, { signal });
+      this.elements.connectModeButton.addEventListener(
+        "click",
+        () => {
+          this.editor.toggleConnectMode();
+          this.elements.connectModeButton.classList.toggle("active");
+        },
+        { signal }
+      );
 
-      this.elements.clearAllButton.addEventListener('click', () => {
-        if (confirm('Are you sure you want to clear everything?')) {
-          this.editor.clearAll();
-          this.elements.connectModeButton.classList.remove('active');
-          this.clearUndoRedo();
-        }
-      }, { signal });
+      this.elements.clearAllButton.addEventListener(
+        "click",
+        () => {
+          if (confirm("Are you sure you want to clear everything?")) {
+            this.editor.clearAll();
+            this.elements.connectModeButton.classList.remove("active");
+            this.clearUndoRedo();
+          }
+        },
+        { signal }
+      );
 
       // Keyboard shortcuts
       if (this.options.enableKeyboardShortcuts) {
-        document.addEventListener('keydown', this.handleKeyDown, { signal });
-        this.state.features.push('Keyboard Shortcuts');
+        document.addEventListener("keydown", this.handleKeyDown, { signal });
+        this.state.features.push("Keyboard Shortcuts");
       }
 
       // Prevent context menu on canvas
-      this.elements.canvas.addEventListener('contextmenu', (e) => e.preventDefault(), { signal });
+      this.elements.canvas.addEventListener(
+        "contextmenu",
+        (e) => e.preventDefault(),
+        { signal }
+      );
 
-      this.state.features.push('Event Handling');
-
+      this.state.features.push("Event Handling");
     } catch (error) {
       throw new Error(
         `Failed to setup event listeners: ${
@@ -493,23 +549,22 @@ class VisualProgrammingApp {
     try {
       if (this.options.enableUndoRedo) {
         this.setupUndoRedo();
-        this.state.features.push('Undo/Redo');
+        this.state.features.push("Undo/Redo");
       }
 
       if (this.options.enableMinimap) {
         this.setupMinimap();
-        this.state.features.push('Minimap');
+        this.state.features.push("Minimap");
       }
 
       if (this.options.enableExample) {
         this.buildExampleProgram();
-        this.state.features.push('Example Program');
+        this.state.features.push("Example Program");
       }
 
       this.updateStats();
-
     } catch (error) {
-      console.warn('Some features failed to initialize:', error);
+      console.warn("Some features failed to initialize:", error);
     }
   }
 
@@ -519,19 +574,19 @@ class VisualProgrammingApp {
   private readonly handleKeyDown = (e: KeyboardEvent): void => {
     if (e.ctrlKey || e.metaKey) {
       switch (e.key) {
-        case 's':
+        case "s":
           e.preventDefault();
           this.saveProgram();
           break;
-        case 'o':
+        case "o":
           e.preventDefault();
           this.loadProgram();
           break;
-        case 'Enter':
+        case "Enter":
           e.preventDefault();
           this.executeProgram();
           break;
-        case 'z':
+        case "z":
           if (e.shiftKey) {
             e.preventDefault();
             this.redo();
@@ -540,7 +595,7 @@ class VisualProgrammingApp {
             this.undo();
           }
           break;
-        case 'y':
+        case "y":
           e.preventDefault();
           this.redo();
           break;
@@ -553,23 +608,24 @@ class VisualProgrammingApp {
    */
   private async executeProgram(): Promise<void> {
     try {
-      this.elements.runButton.textContent = '⏸ Running...';
+      this.elements.runButton.textContent = "⏸ Running...";
       (this.elements.runButton as HTMLButtonElement).disabled = true;
-      
+
       await this.editor.executeProgram({
         stepDelay: 600,
         maxExecutionTime: 30000,
-        maxSteps: 50
+        maxSteps: 50,
       });
-      
     } catch (error) {
-      console.error('Execution error:', error);
+      console.error("Execution error:", error);
       this.updateStatus(
-        `Execution failed: ${error instanceof Error ? error.message : String(error)}`,
-        'error'
+        `Execution failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        "error"
       );
     } finally {
-      this.elements.runButton.textContent = '▶ Execute Code';
+      this.elements.runButton.textContent = "▶ Execute Code";
       (this.elements.runButton as HTMLButtonElement).disabled = false;
     }
   }
@@ -580,40 +636,43 @@ class VisualProgrammingApp {
   private saveProgram(): void {
     try {
       const state = this.editor.getState();
-      const timestamp = new Date().toISOString().split('T')[0];
+      const timestamp = new Date().toISOString().split("T")[0];
       const filename = sanitizeFilename(`visual-program-${timestamp}.json`);
-      
+
       // Save to localStorage as backup
-      localStorage.setItem('visual-programming-backup', JSON.stringify({
-        ...state,
-        savedAt: new Date().toISOString(),
-        version: '1.0.0'
-      }));
-      
+      localStorage.setItem(
+        "visual-programming-backup",
+        JSON.stringify({
+          ...state,
+          savedAt: new Date().toISOString(),
+          version: "1.0.0",
+        })
+      );
+
       // Download as file
-      const blob = new Blob([JSON.stringify(state, null, 2)], { 
-        type: 'application/json' 
+      const blob = new Blob([JSON.stringify(state, null, 2)], {
+        type: "application/json",
       });
       const url = URL.createObjectURL(blob);
-      
-      const a = document.createElement('a');
+
+      const a = document.createElement("a");
       a.href = url;
       a.download = filename;
-      a.style.display = 'none';
-      
+      a.style.display = "none";
+
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      
+
       // Clean up blob URL
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      
-      this.updateStatus(`Program saved as ${filename}`, 'success');
-      
+
+      this.updateStatus(`Program saved as ${filename}`, "success");
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.updateStatus(`Save failed: ${errorMessage}`, 'error');
-      console.error('Save error:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.updateStatus(`Save failed: ${errorMessage}`, "error");
+      console.error("Save error:", error);
     }
   }
 
@@ -622,51 +681,53 @@ class VisualProgrammingApp {
    */
   private loadProgram(): void {
     try {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = '.json';
-      input.style.display = 'none';
-      
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".json";
+      input.style.display = "none";
+
       input.onchange = async (e) => {
         const file = (e.target as HTMLInputElement).files?.[0];
         if (!file) return;
-        
+
         try {
-          if (file.size > 10 * 1024 * 1024) { // 10MB limit
-            throw new Error('File too large (max 10MB)');
+          if (file.size > 10 * 1024 * 1024) {
+            // 10MB limit
+            throw new Error("File too large (max 10MB)");
           }
 
           const text = await file.text();
           const state = JSON.parse(text);
-          
+
           validateStateFormat(state);
           this.editor.loadState(state);
           this.updateStats();
           this.clearUndoRedo(); // Clear undo history after load
-          
-          this.updateStatus(`Loaded program from ${file.name}`, 'success');
-          
+
+          this.updateStatus(`Loaded program from ${file.name}`, "success");
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          this.updateStatus(`Load failed: ${errorMessage}`, 'error');
-          console.error('Load error:', error);
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          this.updateStatus(`Load failed: ${errorMessage}`, "error");
+          console.error("Load error:", error);
         } finally {
           input.remove();
         }
       };
-      
+
       input.onerror = () => {
-        this.updateStatus('Failed to read file', 'error');
+        this.updateStatus("Failed to read file", "error");
         input.remove();
       };
-      
+
       document.body.appendChild(input);
       input.click();
-      
     } catch (error) {
       this.updateStatus(
-        `Load failed: ${error instanceof Error ? error.message : String(error)}`,
-        'error'
+        `Load failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        "error"
       );
     }
   }
@@ -677,32 +738,39 @@ class VisualProgrammingApp {
   private updateStats(): void {
     try {
       const stats = this.editor.getStats();
-      this.elements.elementCountElement.textContent = String(stats.elementCount);
-      this.elements.connectionCountElement.textContent = String(stats.connectionCount);
+      this.elements.elementCountElement.textContent = String(
+        stats.elementCount
+      );
+      this.elements.connectionCountElement.textContent = String(
+        stats.connectionCount
+      );
     } catch (error) {
-      console.warn('Failed to update stats:', error);
+      console.warn("Failed to update stats:", error);
     }
   }
 
   /**
    * Update status message safely
    */
-  private updateStatus(message: string, type?: 'success' | 'error' | 'running'): void {
+  private updateStatus(
+    message: string,
+    type?: "success" | "error" | "running"
+  ): void {
     try {
-      this.elements.statusElement.textContent = message || 'Ready';
-      this.elements.statusElement.className = `status ${type || ''}`;
-      
+      this.elements.statusElement.textContent = message || "Ready";
+      this.elements.statusElement.className = `status ${type || ""}`;
+
       // Auto-clear non-error messages
-      if (type !== 'error') {
+      if (type !== "error") {
         setTimeout(() => {
           if (this.elements.statusElement.textContent === message) {
-            this.elements.statusElement.textContent = 'Ready';
-            this.elements.statusElement.className = 'status';
+            this.elements.statusElement.textContent = "Ready";
+            this.elements.statusElement.className = "status";
           }
         }, 3000);
       }
     } catch (error) {
-      console.warn('Failed to update status:', error);
+      console.warn("Failed to update status:", error);
     }
   }
 
@@ -722,23 +790,25 @@ class VisualProgrammingApp {
 
     try {
       const state = JSON.stringify(this.editor.getState());
-      
+
       // Don't save if state hasn't changed
-      const lastState = this.undoRedoState.undoStack[this.undoRedoState.undoStack.length - 1];
+      const lastState =
+        this.undoRedoState.undoStack[this.undoRedoState.undoStack.length - 1];
       if (lastState === state) return;
-      
+
       this.undoRedoState.undoStack.push(state);
-      
+
       // Limit stack size
-      if (this.undoRedoState.undoStack.length > this.undoRedoState.maxStackSize) {
+      if (
+        this.undoRedoState.undoStack.length > this.undoRedoState.maxStackSize
+      ) {
         this.undoRedoState.undoStack.shift();
       }
-      
+
       // Clear redo stack on new action
       this.undoRedoState.redoStack.length = 0;
-      
     } catch (error) {
-      console.warn('Failed to save undo state:', error);
+      console.warn("Failed to save undo state:", error);
     }
   }
 
@@ -751,17 +821,17 @@ class VisualProgrammingApp {
     try {
       const currentState = this.undoRedoState.undoStack.pop()!;
       this.undoRedoState.redoStack.push(currentState);
-      
-      const previousState = this.undoRedoState.undoStack[this.undoRedoState.undoStack.length - 1];
+
+      const previousState =
+        this.undoRedoState.undoStack[this.undoRedoState.undoStack.length - 1];
       const state = JSON.parse(previousState);
-      
+
       this.editor.loadState(state);
       this.updateStats();
-      this.updateStatus('Undid last action', 'success');
-      
+      this.updateStatus("Undid last action", "success");
     } catch (error) {
-      this.updateStatus('Undo failed', 'error');
-      console.error('Undo error:', error);
+      this.updateStatus("Undo failed", "error");
+      console.error("Undo error:", error);
     }
   }
 
@@ -774,15 +844,14 @@ class VisualProgrammingApp {
     try {
       const stateToRestore = this.undoRedoState.redoStack.pop()!;
       this.undoRedoState.undoStack.push(stateToRestore);
-      
+
       const state = JSON.parse(stateToRestore);
       this.editor.loadState(state);
       this.updateStats();
-      this.updateStatus('Redid last action', 'success');
-      
+      this.updateStatus("Redid last action", "success");
     } catch (error) {
-      this.updateStatus('Redo failed', 'error');
-      console.error('Redo error:', error);
+      this.updateStatus("Redo failed", "error");
+      console.error("Redo error:", error);
     }
   }
 
@@ -800,8 +869,8 @@ class VisualProgrammingApp {
    */
   private setupMinimap(): void {
     try {
-      const minimapContainer = document.createElement('div');
-      minimapContainer.className = 'minimap-container';
+      const minimapContainer = document.createElement("div");
+      minimapContainer.className = "minimap-container";
       minimapContainer.innerHTML = `
         <div class="minimap-header">
           <span>Program Overview</span>
@@ -814,21 +883,28 @@ class VisualProgrammingApp {
       this.addMinimapStyles();
       document.body.appendChild(minimapContainer);
 
-      const canvas = minimapContainer.querySelector('.minimap-canvas') as HTMLCanvasElement;
-      const ctx = canvas.getContext('2d');
-      const toggleBtn = minimapContainer.querySelector('.minimap-toggle') as HTMLButtonElement;
+      const canvas = minimapContainer.querySelector(
+        ".minimap-canvas"
+      ) as HTMLCanvasElement;
+      const ctx = canvas.getContext("2d");
+      const toggleBtn = minimapContainer.querySelector(
+        ".minimap-toggle"
+      ) as HTMLButtonElement;
 
       if (!ctx) {
-        throw new Error('Failed to get canvas context');
+        throw new Error("Failed to get canvas context");
       }
 
       let isCollapsed = false;
 
-      toggleBtn.addEventListener('click', () => {
+      toggleBtn.addEventListener("click", () => {
         isCollapsed = !isCollapsed;
-        minimapContainer.classList.toggle('collapsed', isCollapsed);
-        toggleBtn.textContent = isCollapsed ? '📍' : '📌';
-        toggleBtn.setAttribute('aria-label', isCollapsed ? 'Show minimap' : 'Hide minimap');
+        minimapContainer.classList.toggle("collapsed", isCollapsed);
+        toggleBtn.textContent = isCollapsed ? "📍" : "📌";
+        toggleBtn.setAttribute(
+          "aria-label",
+          isCollapsed ? "Show minimap" : "Hide minimap"
+        );
       });
 
       // Update minimap periodically
@@ -838,36 +914,41 @@ class VisualProgrammingApp {
         try {
           this.drawMinimap(ctx, canvas);
         } catch (error) {
-          console.warn('Minimap update failed:', error);
+          console.warn("Minimap update failed:", error);
         }
       };
 
       // Update every 500ms
       setInterval(updateMinimap, 500);
-      
+
       // Initial update
       setTimeout(updateMinimap, 1000);
-
     } catch (error) {
-      console.warn('Failed to setup minimap:', error);
+      console.warn("Failed to setup minimap:", error);
     }
   }
 
   /**
    * Draw minimap content
    */
-  private drawMinimap(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
+  private drawMinimap(
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement
+  ): void {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
+
     // Draw background
-    ctx.fillStyle = 'rgba(10, 10, 15, 0.5)';
+    ctx.fillStyle = "rgba(10, 10, 15, 0.5)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const state = this.editor.getState();
     if (state.elements.length === 0) return;
 
     // Calculate bounds
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
     for (const el of state.elements) {
       minX = Math.min(minX, el.x);
       minY = Math.min(minY, el.y);
@@ -881,18 +962,18 @@ class VisualProgrammingApp {
     );
 
     // Draw connections
-    ctx.strokeStyle = 'rgba(0, 212, 255, 0.6)';
+    ctx.strokeStyle = "rgba(0, 212, 255, 0.6)";
     ctx.lineWidth = 1;
     for (const conn of state.connections) {
-      const fromEl = state.elements.find(el => el.id === conn.fromId);
-      const toEl = state.elements.find(el => el.id === conn.toId);
-      
+      const fromEl = state.elements.find((el) => el.id === conn.fromId);
+      const toEl = state.elements.find((el) => el.id === conn.toId);
+
       if (fromEl && toEl) {
         const fromX = (fromEl.x - minX) * scale + 10;
         const fromY = (fromEl.y - minY) * scale + 10;
         const toX = (toEl.x - minX) * scale + 10;
         const toY = (toEl.y - minY) * scale + 10;
-        
+
         ctx.beginPath();
         ctx.moveTo(fromX, fromY);
         ctx.lineTo(toX, toY);
@@ -902,12 +983,12 @@ class VisualProgrammingApp {
 
     // Draw elements
     const typeColors: Record<string, string> = {
-      variable: 'rgba(239, 68, 68, 0.8)',
-      array: 'rgba(139, 92, 246, 0.8)',
-      function: 'rgba(245, 158, 11, 0.8)',
-      loop: 'rgba(16, 185, 129, 0.8)',
-      counter: 'rgba(0, 212, 255, 0.8)',
-      return: 'rgba(236, 72, 153, 0.8)'
+      variable: "rgba(239, 68, 68, 0.8)",
+      array: "rgba(139, 92, 246, 0.8)",
+      function: "rgba(245, 158, 11, 0.8)",
+      loop: "rgba(16, 185, 129, 0.8)",
+      counter: "rgba(0, 212, 255, 0.8)",
+      return: "rgba(236, 72, 153, 0.8)",
     };
 
     for (const el of state.elements) {
@@ -916,11 +997,11 @@ class VisualProgrammingApp {
       const w = Math.max(2, 140 * scale);
       const h = Math.max(2, 64 * scale);
 
-      ctx.fillStyle = typeColors[el.type] || 'rgba(255, 255, 255, 0.3)';
+      ctx.fillStyle = typeColors[el.type] || "rgba(255, 255, 255, 0.3)";
       ctx.fillRect(x, y, w, h);
-      
+
       // Add border
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
       ctx.lineWidth = 0.5;
       ctx.strokeRect(x, y, w, h);
     }
@@ -930,10 +1011,10 @@ class VisualProgrammingApp {
    * Add minimap styles
    */
   private addMinimapStyles(): void {
-    const styleId = 'minimap-styles';
+    const styleId = "minimap-styles";
     if (document.getElementById(styleId)) return;
 
-    const style = document.createElement('style');
+    const style = document.createElement("style");
     style.id = styleId;
     style.textContent = `
       .minimap-container {
@@ -983,7 +1064,7 @@ class VisualProgrammingApp {
         display: none;
       }
     `;
-    
+
     document.head.appendChild(style);
   }
 
@@ -993,24 +1074,24 @@ class VisualProgrammingApp {
   private buildExampleProgram(): void {
     try {
       // Create example elements with error handling
-      const arrayId = this.editor.addElement('array', 150, 200, {
-        name: 'numbers',
-        items: [1, 2, 3, 4, 5]
+      const arrayId = this.editor.addElement("array", 150, 200, {
+        name: "numbers",
+        items: [1, 2, 3, 4, 5],
       });
-      
-      const functionId = this.editor.addElement('function', 350, 180, {
-        name: 'getLength',
-        params: 'arr'
+
+      const functionId = this.editor.addElement("function", 350, 180, {
+        name: "getLength",
+        params: "arr",
       });
-      
-      const loopId = this.editor.addElement('loop', 550, 200);
-      
-      const counterId = this.editor.addElement('counter', 750, 160, {
-        value: 0
+
+      const loopId = this.editor.addElement("loop", 550, 200);
+
+      const counterId = this.editor.addElement("counter", 750, 160, {
+        value: 0,
       });
-      
-      const printId = this.editor.addElement('print', 550, 280, {
-        message: 'Processing item...'
+
+      const printId = this.editor.addElement("print", 550, 280, {
+        message: "Processing item...",
       });
 
       // Create connections with delay to ensure DOM readiness
@@ -1020,17 +1101,19 @@ class VisualProgrammingApp {
           this.editor.createConnection(functionId, loopId);
           this.editor.createConnection(loopId, counterId);
           this.editor.createConnection(loopId, printId);
-          
+
           this.updateStats();
           this.saveUndoState(); // Save example as initial state
-          this.updateStatus('Example program loaded - try executing it!', 'success');
+          this.updateStatus(
+            "Example program loaded - try executing it!",
+            "success"
+          );
         } catch (error) {
-          console.warn('Failed to create example connections:', error);
+          console.warn("Failed to create example connections:", error);
         }
       }, 100);
-      
     } catch (error) {
-      console.warn('Failed to build example program:', error);
+      console.warn("Failed to build example program:", error);
     }
   }
 
@@ -1039,7 +1122,7 @@ class VisualProgrammingApp {
    */
   private showErrorUI(error: unknown): void {
     try {
-      const errorDiv = document.createElement('div');
+      const errorDiv = document.createElement("div");
       errorDiv.style.cssText = `
         position: fixed;
         top: 50%;
@@ -1055,8 +1138,9 @@ class VisualProgrammingApp {
         max-width: 400px;
         box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
       `;
-      
-      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       errorDiv.innerHTML = `
         <h3>⚠️ Initialization Error</h3>
         <p>Failed to start the Visual Programming Framework.</p>
@@ -1068,19 +1152,18 @@ class VisualProgrammingApp {
           Check the browser console for more details.
         </p>
       `;
-      
+
       document.body.appendChild(errorDiv);
-      
+
       // Remove error after 10 seconds
       setTimeout(() => {
         try {
           errorDiv.remove();
         } catch {}
       }, 10000);
-      
     } catch {
       // Fallback: just log to console if DOM manipulation fails
-      console.error('Critical initialization error:', error);
+      console.error("Critical initialization error:", error);
     }
   }
 }
@@ -1100,11 +1183,11 @@ function initializeApp(): void {
       enableUndoRedo: true,
       enableKeyboardShortcuts: true,
       enableExample: true,
-      persistViewMode: true
+      persistViewMode: true,
     });
 
     // Expose for debugging
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       // @ts-ignore - Augment window for debugging
       window.VisualProgrammingApp = VisualProgrammingApp;
       // @ts-ignore
@@ -1113,30 +1196,31 @@ function initializeApp(): void {
       window.app = app;
     }
 
-    console.log('🚀 Visual Programming Framework fully initialized');
-    console.log('📊 Available features:');
-    console.log('  ✅ Auto-save every 30 seconds');
-    console.log('  ✅ Minimap in bottom-right corner');
-    console.log('  ✅ Undo/Redo with Ctrl+Z/Ctrl+Y');
-    console.log('  ✅ Keyboard shortcuts: Ctrl+S (save), Ctrl+O (load), Ctrl+Enter (run)');
-    console.log('  ✅ View toggle between card/icon modes');
-    console.log('  ✅ Example program with sample blocks');
-    console.log('🔧 Access via window.app for debugging');
-
+    console.log("🚀 Visual Programming Framework fully initialized");
+    console.log("📊 Available features:");
+    console.log("  ✅ Auto-save every 30 seconds");
+    console.log("  ✅ Minimap in bottom-right corner");
+    console.log("  ✅ Undo/Redo with Ctrl+Z/Ctrl+Y");
+    console.log(
+      "  ✅ Keyboard shortcuts: Ctrl+S (save), Ctrl+O (load), Ctrl+Enter (run)"
+    );
+    console.log("  ✅ View toggle between card/icon modes");
+    console.log("  ✅ Example program with sample blocks");
+    console.log("🔧 Access via window.app for debugging");
   } catch (error) {
-    console.error('❌ Failed to initialize application:', error);
+    console.error("❌ Failed to initialize application:", error);
   }
 }
 
 // Initialize when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeApp);
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initializeApp);
 } else {
   initializeApp();
 }
 
 // Global exports for development
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
   // @ts-ignore
   window.VisualProgrammingApp = VisualProgrammingApp;
   // @ts-ignore

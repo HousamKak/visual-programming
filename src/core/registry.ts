@@ -3,7 +3,6 @@
  * Provides strict type safety, runtime validation, and immutable block definitions
  */
 
-import { isDeepStrictEqual } from "util";
 
 // ---------------------------------------------------------------------------
 // Type Definitions
