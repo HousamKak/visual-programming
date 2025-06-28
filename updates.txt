@@ -1,0 +1,1547 @@
+/**
+ * Editable Elements System
+ * Adds inline editing capabilities to visual programming elements
+ */
+
+import { Editor } from './ui/editor.js';
+import { Renderer, type ElementData } from './core/renderer.js';
+import { BlockRegistry } from './core/registry.js';
+
+export interface EditableElementsOptions {
+  readonly enableDoubleClickEdit?: boolean;
+  readonly enableContextMenu?: boolean;
+  readonly enablePropertyPanel?: boolean;
+  readonly onPropertyChanged?: (elementId: string, property: string, value: unknown) => void;
+}
+
+/**
+ * Enhances elements with inline editing capabilities
+ */
+export class EditableElements {
+  private readonly editor: Editor;
+  private readonly options: Required<EditableElementsOptions>;
+  private eventAbortController?: AbortController;
+  private currentEditingElement?: HTMLElement;
+  private propertyPanel?: HTMLElement;
+
+  constructor(editor: Editor, options: EditableElementsOptions = {}) {
+    this.editor = editor;
+    this.options = {
+      enableDoubleClickEdit: true,
+      enableContextMenu: true,
+      enablePropertyPanel: true,
+      onPropertyChanged: () => {},
+      ...options
+    };
+
+    this.setupEditingFeatures();
+  }
+
+  /**
+   * Setup editing features based on options
+   */
+  private setupEditingFeatures(): void {
+    this.eventAbortController = new AbortController();
+    const signal = this.eventAbortController.signal;
+
+    if (this.options.enableDoubleClickEdit) {
+      this.setupDoubleClickEditing(signal);
+    }
+
+    if (this.options.enableContextMenu) {
+      this.setupContextMenu(signal);
+    }
+
+    if (this.options.enablePropertyPanel) {
+      this.setupPropertyPanel();
+    }
+  }
+
+  /**
+   * Setup double-click editing for elements
+   */
+  private setupDoubleClickEditing(signal: AbortSignal): void {
+    const canvas = document.getElementById('canvas');
+    if (!canvas) return;
+
+    canvas.addEventListener('dblclick', (e) => {
+      const element = (e.target as Element).closest('.element') as HTMLElement;
+      if (!element || !element.dataset.elementId) return;
+
+      e.preventDefault();
+      this.openElementEditor(element);
+    }, { signal });
+  }
+
+  /**
+   * Setup context menu for elements
+   */
+  private setupContextMenu(signal: AbortSignal): void {
+    const canvas = document.getElementById('canvas');
+    if (!canvas) return;
+
+    canvas.addEventListener('contextmenu', (e) => {
+      const element = (e.target as Element).closest('.element') as HTMLElement;
+      if (!element || !element.dataset.elementId) return;
+
+      e.preventDefault();
+      this.showContextMenu(element, e.clientX, e.clientY);
+    }, { signal });
+
+    // Hide context menu on click elsewhere
+    document.addEventListener('click', () => {
+      this.hideContextMenu();
+    }, { signal });
+  }
+
+  /**
+   * Open inline editor for an element
+   */
+  private openElementEditor(element: HTMLElement): void {
+    const elementId = element.dataset.elementId;
+    if (!elementId) return;
+
+    const state = this.editor.getState();
+    const elementData = state.elements.find(el => el.id === elementId);
+    if (!elementData) return;
+
+    const definition = BlockRegistry.get(elementData.type);
+    if (!definition) return;
+
+    this.currentEditingElement = element;
+    this.showInlineEditor(element, elementData, definition);
+  }
+
+  /**
+   * Show inline editor overlay
+   */
+  private showInlineEditor(element: HTMLElement, elementData: ElementData, definition: any): void {
+    // Remove any existing editor
+    this.hideInlineEditor();
+
+    const rect = element.getBoundingClientRect();
+    const editor = document.createElement('div');
+    editor.className = 'inline-element-editor';
+    editor.style.cssText = `
+      position: fixed;
+      left: ${rect.left}px;
+      top: ${rect.bottom + 5}px;
+      background: var(--bg-card, rgba(15, 15, 25, 0.95));
+      border: 2px solid var(--primary-blue, #00d4ff);
+      border-radius: 8px;
+      padding: 12px;
+      z-index: 1000;
+      min-width: 200px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    `;
+
+    // Create form for editing properties
+    const form = document.createElement('form');
+    form.innerHTML = `
+      <div style="font-size: 12px; font-weight: 600; color: var(--primary-blue, #00d4ff); margin-bottom: 8px;">
+        Edit ${definition.displayName}
+      </div>
+    `;
+
+    // Add input fields for editable properties
+    const editableProps = this.getEditableProperties(definition, elementData);
+    
+    for (const [key, propInfo] of Object.entries(editableProps)) {
+      const fieldContainer = document.createElement('div');
+      fieldContainer.style.marginBottom = '8px';
+
+      const label = document.createElement('label');
+      label.textContent = propInfo.label;
+      label.style.cssText = `
+        display: block;
+        font-size: 11px;
+        color: var(--text-secondary, #a1a1aa);
+        margin-bottom: 2px;
+      `;
+
+      const input = this.createInputForProperty(key, propInfo, elementData.props[key]);
+      input.style.cssText = `
+        width: 100%;
+        padding: 4px 8px;
+        border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.1));
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-primary, #ffffff);
+        font-size: 12px;
+      `;
+
+      fieldContainer.appendChild(label);
+      fieldContainer.appendChild(input);
+      form.appendChild(fieldContainer);
+    }
+
+    // Add buttons
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    `;
+
+    const saveButton = document.createElement('button');
+    saveButton.textContent = 'Save';
+    saveButton.type = 'submit';
+    saveButton.style.cssText = `
+      background: var(--accent-green, #10b981);
+      color: #000;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      flex: 1;
+    `;
+
+    const cancelButton = document.createElement('button');
+    cancelButton.textContent = 'Cancel';
+    cancelButton.type = 'button';
+    cancelButton.style.cssText = `
+      background: var(--accent-red, #ef4444);
+      color: #fff;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      flex: 1;
+    `;
+
+    buttonContainer.appendChild(saveButton);
+    buttonContainer.appendChild(cancelButton);
+    form.appendChild(buttonContainer);
+
+    // Handle form submission
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.saveElementChanges(elementData, form);
+    });
+
+    cancelButton.addEventListener('click', () => {
+      this.hideInlineEditor();
+    });
+
+    editor.appendChild(form);
+    document.body.appendChild(editor);
+
+    // Focus first input
+    const firstInput = form.querySelector('input, select, textarea') as HTMLElement;
+    firstInput?.focus();
+  }
+
+  /**
+   * Get editable properties for a block type
+   */
+  private getEditableProperties(definition: any, elementData: ElementData): Record<string, any> {
+    const props: Record<string, any> = {};
+
+    // Common editable properties based on block type
+    switch (elementData.type) {
+      case 'variable':
+        props.name = { label: 'Variable Name', type: 'text' };
+        props.value = { label: 'Initial Value', type: 'text' };
+        break;
+      
+      case 'array':
+        props.items = { label: 'Items (JSON)', type: 'textarea' };
+        break;
+        
+      case 'counter':
+        props.value = { label: 'Initial Value', type: 'number' };
+        props.step = { label: 'Step', type: 'number' };
+        break;
+        
+      case 'function':
+        props.name = { label: 'Function Name', type: 'text' };
+        props.params = { label: 'Parameters', type: 'text' };
+        break;
+        
+      case 'loop':
+        props.count = { label: 'Loop Count', type: 'number' };
+        break;
+        
+      case 'add':
+      case 'multiply':
+        props.a = { label: 'First Value', type: 'number' };
+        props.b = { label: 'Second Value', type: 'number' };
+        break;
+        
+      case 'print':
+        props.message = { label: 'Message', type: 'text' };
+        break;
+        
+      case 'if':
+        props.condition = { label: 'Condition', type: 'text' };
+        break;
+        
+      default:
+        // Generic handling for custom blocks
+        if (definition.defaultProps) {
+          for (const [key, value] of Object.entries(definition.defaultProps)) {
+            if (typeof value === 'string') {
+              props[key] = { label: this.formatLabel(key), type: 'text' };
+            } else if (typeof value === 'number') {
+              props[key] = { label: this.formatLabel(key), type: 'number' };
+            } else if (typeof value === 'boolean') {
+              props[key] = { label: this.formatLabel(key), type: 'checkbox' };
+            }
+          }
+        }
+    }
+
+    return props;
+  }
+
+  /**
+   * Create appropriate input element for property type
+   */
+  private createInputForProperty(key: string, propInfo: any, currentValue: unknown): HTMLElement {
+    switch (propInfo.type) {
+      case 'number':
+        const numberInput = document.createElement('input');
+        numberInput.type = 'number';
+        numberInput.name = key;
+        numberInput.value = String(currentValue ?? '');
+        return numberInput;
+        
+      case 'checkbox':
+        const checkboxInput = document.createElement('input');
+        checkboxInput.type = 'checkbox';
+        checkboxInput.name = key;
+        checkboxInput.checked = Boolean(currentValue);
+        return checkboxInput;
+        
+      case 'textarea':
+        const textarea = document.createElement('textarea');
+        textarea.name = key;
+        textarea.rows = 3;
+        if (Array.isArray(currentValue)) {
+          textarea.value = JSON.stringify(currentValue, null, 2);
+        } else {
+          textarea.value = String(currentValue ?? '');
+        }
+        return textarea;
+        
+      case 'select':
+        const select = document.createElement('select');
+        select.name = key;
+        // Add options based on propInfo.options if available
+        if (propInfo.options) {
+          for (const option of propInfo.options) {
+            const optionEl = document.createElement('option');
+            optionEl.value = option.value;
+            optionEl.textContent = option.label;
+            optionEl.selected = option.value === currentValue;
+            select.appendChild(optionEl);
+          }
+        }
+        return select;
+        
+      default: // text
+        const textInput = document.createElement('input');
+        textInput.type = 'text';
+        textInput.name = key;
+        textInput.value = String(currentValue ?? '');
+        return textInput;
+    }
+  }
+
+  /**
+   * Save changes made in the inline editor
+   */
+  private saveElementChanges(elementData: ElementData, form: HTMLFormElement): void {
+    const formData = new FormData(form);
+    const updatedProps: Record<string, unknown> = { ...elementData.props };
+
+    for (const [key, value] of formData.entries()) {
+      const input = form.querySelector(`[name="${key}"]`) as HTMLInputElement;
+      
+      if (input.type === 'number') {
+        updatedProps[key] = parseFloat(value as string) || 0;
+      } else if (input.type === 'checkbox') {
+        updatedProps[key] = (input as HTMLInputElement).checked;
+      } else if (input.tagName === 'TEXTAREA' && key === 'items') {
+        // Special handling for array items
+        try {
+          updatedProps[key] = JSON.parse(value as string);
+        } catch {
+          updatedProps[key] = value.toString().split(',').map(s => s.trim());
+        }
+      } else {
+        updatedProps[key] = value;
+      }
+    }
+
+    // Update element data
+    elementData.props = updatedProps;
+
+    // Re-render the element
+    this.rerenderElement(elementData);
+
+    // Notify about property changes
+    for (const [key, value] of Object.entries(updatedProps)) {
+      this.options.onPropertyChanged(elementData.id, key, value);
+    }
+
+    this.hideInlineEditor();
+  }
+
+  /**
+   * Re-render an element with updated properties
+   */
+  private rerenderElement(elementData: ElementData): void {
+    const element = document.querySelector(`[data-element-id="${elementData.id}"]`) as HTMLElement;
+    if (!element) return;
+
+    const definition = BlockRegistry.get(elementData.type);
+    if (!definition || !definition.render) return;
+
+    try {
+      const rendered = definition.render(elementData.props);
+      
+      // Update label
+      const labelEl = element.querySelector('.element-label');
+      if (labelEl) {
+        labelEl.textContent = rendered.label;
+      }
+
+      // Update content
+      const contentEl = element.querySelector('.element-content');
+      if (contentEl) {
+        contentEl.textContent = rendered.content;
+      }
+
+      // Update value if present
+      const valueEl = element.querySelector('.element-value');
+      if (valueEl && rendered.value !== undefined) {
+        valueEl.textContent = rendered.value;
+      }
+
+      // Special handling for array elements
+      if (elementData.type === 'array' && Array.isArray(elementData.props.items)) {
+        this.rerenderArrayContent(contentEl as HTMLElement, elementData.props.items as unknown[]);
+      }
+    } catch (error) {
+      console.warn('Failed to re-render element:', error);
+    }
+  }
+
+  /**
+   * Re-render array content specifically
+   */
+  private rerenderArrayContent(container: HTMLElement, items: unknown[]): void {
+    if (!container) return;
+
+    container.innerHTML = '';
+    container.className = 'element-content array-container';
+
+    const openBracket = document.createElement('span');
+    openBracket.className = 'array-bracket';
+    openBracket.textContent = '[';
+    container.appendChild(openBracket);
+
+    const maxVisible = Math.min(5, items.length);
+    const visibleItems = items.slice(0, maxVisible);
+
+    for (const item of visibleItems) {
+      const itemEl = document.createElement('div');
+      itemEl.className = 'array-item';
+      const itemStr = String(item);
+      itemEl.textContent = itemStr.slice(0, 2);
+      itemEl.title = itemStr.slice(0, 100);
+      container.appendChild(itemEl);
+    }
+
+    if (items.length > maxVisible) {
+      const moreEl = document.createElement('div');
+      moreEl.className = 'array-item';
+      moreEl.textContent = '...';
+      moreEl.title = `${items.length - maxVisible} more items`;
+      container.appendChild(moreEl);
+    }
+
+    const closeBracket = document.createElement('span');
+    closeBracket.className = 'array-bracket';
+    closeBracket.textContent = ']';
+    container.appendChild(closeBracket);
+  }
+
+  /**
+   * Show context menu for element
+   */
+  private showContextMenu(element: HTMLElement, x: number, y: number): void {
+    this.hideContextMenu();
+
+    const menu = document.createElement('div');
+    menu.className = 'element-context-menu';
+    menu.style.cssText = `
+      position: fixed;
+      left: ${x}px;
+      top: ${y}px;
+      background: var(--bg-card, rgba(15, 15, 25, 0.95));
+      border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.1));
+      border-radius: 6px;
+      padding: 4px 0;
+      z-index: 2000;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      min-width: 120px;
+    `;
+
+    const menuItems = [
+      { label: 'Edit Properties', action: () => this.openElementEditor(element) },
+      { label: 'Duplicate', action: () => this.duplicateElement(element) },
+      { label: 'Delete', action: () => this.deleteElement(element) },
+    ];
+
+    for (const item of menuItems) {
+      const menuItem = document.createElement('div');
+      menuItem.textContent = item.label;
+      menuItem.style.cssText = `
+        padding: 6px 12px;
+        cursor: pointer;
+        font-size: 12px;
+        color: var(--text-primary, #ffffff);
+        transition: background 0.1s ease;
+      `;
+
+      menuItem.addEventListener('mouseenter', () => {
+        menuItem.style.background = 'rgba(255, 255, 255, 0.1)';
+      });
+
+      menuItem.addEventListener('mouseleave', () => {
+        menuItem.style.background = 'transparent';
+      });
+
+      menuItem.addEventListener('click', () => {
+        item.action();
+        this.hideContextMenu();
+      });
+
+      menu.appendChild(menuItem);
+    }
+
+    document.body.appendChild(menu);
+  }
+
+  /**
+   * Hide context menu
+   */
+  private hideContextMenu(): void {
+    const menu = document.querySelector('.element-context-menu');
+    if (menu) {
+      menu.remove();
+    }
+  }
+
+  /**
+   * Hide inline editor
+   */
+  private hideInlineEditor(): void {
+    const editor = document.querySelector('.inline-element-editor');
+    if (editor) {
+      editor.remove();
+    }
+    this.currentEditingElement = undefined;
+  }
+
+  /**
+   * Duplicate an element
+   */
+  private duplicateElement(element: HTMLElement): void {
+    const elementId = element.dataset.elementId;
+    if (!elementId) return;
+
+    const state = this.editor.getState();
+    const elementData = state.elements.find(el => el.id === elementId);
+    if (!elementData) return;
+
+    // Add duplicated element with slight offset
+    try {
+      this.editor.addElement(
+        elementData.type,
+        elementData.x + 20,
+        elementData.y + 20,
+        { ...elementData.props }
+      );
+    } catch (error) {
+      console.warn('Failed to duplicate element:', error);
+    }
+  }
+
+  /**
+   * Delete an element
+   */
+  private deleteElement(element: HTMLElement): void {
+    const elementId = element.dataset.elementId;
+    if (!elementId) return;
+
+    if (confirm('Delete this element and all its connections?')) {
+      this.editor.removeElement(elementId);
+    }
+  }
+
+  /**
+   * Setup property panel
+   */
+  private setupPropertyPanel(): void {
+    // Create property panel if it doesn't exist
+    if (!document.querySelector('.property-panel')) {
+      this.createPropertyPanel();
+    }
+  }
+
+  /**
+   * Create property panel UI
+   */
+  private createPropertyPanel(): void {
+    const panel = document.createElement('div');
+    panel.className = 'property-panel';
+    panel.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      right: 280px;
+      width: 200px;
+      background: var(--bg-card, rgba(15, 15, 25, 0.9));
+      border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.1));
+      border-radius: 8px;
+      padding: 12px;
+      z-index: 90;
+      backdrop-filter: blur(20px);
+      display: none;
+    `;
+
+    panel.innerHTML = `
+      <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--primary-blue, #00d4ff);">
+        Properties
+      </div>
+      <div class="property-content">
+        Select an element to view its properties
+      </div>
+    `;
+
+    document.body.appendChild(panel);
+    this.propertyPanel = panel;
+  }
+
+  /**
+   * Format property name for display
+   */
+  private formatLabel(key: string): string {
+    return key
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .trim();
+  }
+
+  /**
+   * Dispose of resources
+   */
+  dispose(): void {
+    if (this.eventAbortController) {
+      this.eventAbortController.abort();
+    }
+    this.hideInlineEditor();
+    this.hideContextMenu();
+    if (this.propertyPanel) {
+      this.propertyPanel.remove();
+    }
+  }
+}
+
+
+/**
+ * Enhanced Block Registry with Assignment and Mutation Operations
+ * Extends the core registry with blocks that can modify values during execution
+ */
+
+import { BlockRegistry } from './core/registry.js';
+
+/**
+ * Register enhanced block types for value assignment and manipulation
+ */
+export function registerEnhancedBlocks(): void {
+  try {
+    // Enhanced Variable with Assignment
+    BlockRegistry.register("set_variable", {
+      displayName: "Set Variable",
+      category: "data",
+      inputs: ["target", "value"],
+      outputs: ["result"],
+      defaultProps: { name: "myVar" },
+      description: "Assigns a value to a variable",
+      execute: async (ctx) => {
+        const name = ctx.inputs.name || ctx.inputs.target || "variable";
+        const value = ctx.inputs.value ?? null;
+        
+        // Store in global state for access by other blocks
+        const globalState = ctx.state.get("__global__") || new Map();
+        if (!ctx.state.has("__global__")) {
+          ctx.state.set("__global__", globalState);
+        }
+        
+        globalState.set(String(name), value);
+        ctx.setValue("result", value);
+        ctx.log(`Set ${name} = ${JSON.stringify(value)}`);
+        
+        await ctx.go("result", value);
+      },
+      render: (props) => ({
+        label: "SET",
+        content: `${props.name || "var"} = ?`,
+      }),
+    });
+
+    // Get Variable Value
+    BlockRegistry.register("get_variable", {
+      displayName: "Get Variable",
+      category: "data",
+      inputs: [],
+      outputs: ["value"],
+      defaultProps: { name: "myVar" },
+      description: "Gets the current value of a variable",
+      execute: async (ctx) => {
+        const name = ctx.inputs.name || "variable";
+        const globalState = ctx.state.get("__global__");
+        const value = globalState?.get(String(name)) ?? null;
+        
+        ctx.setValue("value", value);
+        ctx.log(`Get ${name} = ${JSON.stringify(value)}`);
+        
+        await ctx.go("value", value);
+      },
+      render: (props) => ({
+        label: "GET",
+        content: String(props.name || "var"),
+      }),
+    });
+
+    // Array Push - Add element to array
+    BlockRegistry.register("array_push", {
+      displayName: "Array Push",
+      category: "data",
+      inputs: ["array", "item"],
+      outputs: ["result"],
+      defaultProps: {},
+      description: "Adds an item to the end of an array",
+      execute: async (ctx) => {
+        const inputArray = ctx.inputs.array;
+        const item = ctx.inputs.item;
+        
+        let resultArray: unknown[];
+        if (Array.isArray(inputArray)) {
+          resultArray = [...inputArray, item];
+        } else {
+          resultArray = [item];
+        }
+        
+        ctx.setValue("result", resultArray);
+        ctx.log(`Pushed ${JSON.stringify(item)} to array (length: ${resultArray.length})`);
+        
+        await ctx.go("result", resultArray);
+      },
+      render: () => ({
+        label: "PUSH",
+        content: "array.push(item)",
+      }),
+    });
+
+    // Array Pop - Remove last element
+    BlockRegistry.register("array_pop", {
+      displayName: "Array Pop",
+      category: "data",
+      inputs: ["array"],
+      outputs: ["array", "item"],
+      defaultProps: {},
+      description: "Removes and returns the last item from an array",
+      execute: async (ctx) => {
+        const inputArray = ctx.inputs.array;
+        
+        if (!Array.isArray(inputArray) || inputArray.length === 0) {
+          ctx.log("Cannot pop from empty or non-array");
+          await ctx.go("array", inputArray);
+          await ctx.go("item", null);
+          return;
+        }
+        
+        const resultArray = [...inputArray];
+        const poppedItem = resultArray.pop();
+        
+        ctx.setValue("array", resultArray);
+        ctx.setValue("item", poppedItem);
+        ctx.log(`Popped ${JSON.stringify(poppedItem)} from array`);
+        
+        await ctx.go("array", resultArray);
+        await ctx.go("item", poppedItem);
+      },
+      render: () => ({
+        label: "POP",
+        content: "array.pop()",
+      }),
+    });
+
+    // Array Get by Index
+    BlockRegistry.register("array_get", {
+      displayName: "Array Get",
+      category: "data",
+      inputs: ["array", "index"],
+      outputs: ["value"],
+      defaultProps: { index: 0 },
+      description: "Gets an item from an array by index",
+      execute: async (ctx) => {
+        const inputArray = ctx.inputs.array;
+        const index = Number(ctx.inputs.index ?? 0);
+        
+        let value = null;
+        if (Array.isArray(inputArray) && index >= 0 && index < inputArray.length) {
+          value = inputArray[index];
+        }
+        
+        ctx.setValue("value", value);
+        ctx.log(`Get array[${index}] = ${JSON.stringify(value)}`);
+        
+        await ctx.go("value", value);
+      },
+      render: (props) => ({
+        label: "GET",
+        content: `array[${props.index ?? 0}]`,
+      }),
+    });
+
+    // Array Set by Index
+    BlockRegistry.register("array_set", {
+      displayName: "Array Set",
+      category: "data",
+      inputs: ["array", "index", "value"],
+      outputs: ["result"],
+      defaultProps: { index: 0 },
+      description: "Sets an item in an array by index",
+      execute: async (ctx) => {
+        const inputArray = ctx.inputs.array;
+        const index = Number(ctx.inputs.index ?? 0);
+        const value = ctx.inputs.value;
+        
+        let resultArray: unknown[];
+        if (Array.isArray(inputArray)) {
+          resultArray = [...inputArray];
+          if (index >= 0) {
+            // Extend array if necessary
+            while (resultArray.length <= index) {
+              resultArray.push(null);
+            }
+            resultArray[index] = value;
+          }
+        } else {
+          // Create new array if input wasn't an array
+          resultArray = [];
+          if (index >= 0) {
+            while (resultArray.length <= index) {
+              resultArray.push(null);
+            }
+            resultArray[index] = value;
+          }
+        }
+        
+        ctx.setValue("result", resultArray);
+        ctx.log(`Set array[${index}] = ${JSON.stringify(value)}`);
+        
+        await ctx.go("result", resultArray);
+      },
+      render: (props) => ({
+        label: "SET",
+        content: `array[${props.index ?? 0}] = ?`,
+      }),
+    });
+
+    // Object Get Property
+    BlockRegistry.register("object_get", {
+      displayName: "Object Get",
+      category: "data",
+      inputs: ["object", "key"],
+      outputs: ["value"],
+      defaultProps: { key: "property" },
+      description: "Gets a property value from an object",
+      execute: async (ctx) => {
+        const inputObject = ctx.inputs.object;
+        const key = String(ctx.inputs.key ?? "property");
+        
+        let value = null;
+        if (inputObject && typeof inputObject === "object" && !Array.isArray(inputObject)) {
+          value = (inputObject as Record<string, unknown>)[key];
+        }
+        
+        ctx.setValue("value", value);
+        ctx.log(`Get object.${key} = ${JSON.stringify(value)}`);
+        
+        await ctx.go("value", value);
+      },
+      render: (props) => ({
+        label: "GET",
+        content: `obj.${props.key || "prop"}`,
+      }),
+    });
+
+    // Object Set Property
+    BlockRegistry.register("object_set", {
+      displayName: "Object Set",
+      category: "data",
+      inputs: ["object", "key", "value"],
+      outputs: ["result"],
+      defaultProps: { key: "property" },
+      description: "Sets a property value on an object",
+      execute: async (ctx) => {
+        const inputObject = ctx.inputs.object;
+        const key = String(ctx.inputs.key ?? "property");
+        const value = ctx.inputs.value;
+        
+        let resultObject: Record<string, unknown>;
+        if (inputObject && typeof inputObject === "object" && !Array.isArray(inputObject)) {
+          resultObject = { ...(inputObject as Record<string, unknown>) };
+        } else {
+          resultObject = {};
+        }
+        
+        resultObject[key] = value;
+        
+        ctx.setValue("result", resultObject);
+        ctx.log(`Set object.${key} = ${JSON.stringify(value)}`);
+        
+        await ctx.go("result", resultObject);
+      },
+      render: (props) => ({
+        label: "SET",
+        content: `obj.${props.key || "prop"} = ?`,
+      }),
+    });
+
+    // Enhanced Counter with Increment Control
+    BlockRegistry.register("counter_increment", {
+      displayName: "Increment Counter",
+      category: "data",
+      inputs: ["trigger", "step"],
+      outputs: ["count"],
+      defaultProps: { initialValue: 0, step: 1 },
+      description: "Increments a counter each time it receives input",
+      execute: async (ctx) => {
+        const step = Number(ctx.inputs.step ?? ctx.inputs.initialStep ?? 1);
+        const currentCount = (ctx.getValue("count") as number) ?? Number(ctx.inputs.initialValue ?? 0);
+        const newCount = currentCount + step;
+        
+        ctx.setValue("count", newCount);
+        ctx.log(`Counter: ${currentCount} + ${step} = ${newCount}`);
+        
+        await ctx.go("count", newCount);
+      },
+      render: (props) => ({
+        label: "INC",
+        content: `+${props.step ?? 1}`,
+        value: String(props.initialValue ?? 0),
+      }),
+    });
+
+    // Counter Reset
+    BlockRegistry.register("counter_reset", {
+      displayName: "Reset Counter",
+      category: "data",
+      inputs: ["trigger"],
+      outputs: ["count"],
+      defaultProps: { value: 0 },
+      description: "Resets a counter to a specific value",
+      execute: async (ctx) => {
+        const resetValue = Number(ctx.inputs.value ?? 0);
+        
+        ctx.setValue("count", resetValue);
+        ctx.log(`Counter reset to ${resetValue}`);
+        
+        await ctx.go("count", resetValue);
+      },
+      render: (props) => ({
+        label: "RESET",
+        content: `reset to ${props.value ?? 0}`,
+      }),
+    });
+
+    // Enhanced Loop with Dynamic Condition
+    BlockRegistry.register("while_loop", {
+      displayName: "While Loop",
+      category: "control",
+      inputs: ["condition"],
+      outputs: ["body", "done"],
+      defaultProps: { maxIterations: 100 },
+      description: "Loops while condition is true",
+      execute: async (ctx) => {
+        const maxIterations = Number(ctx.inputs.maxIterations ?? 100);
+        let iterations = 0;
+        
+        while (iterations < maxIterations) {
+          const condition = ctx.inputs.condition;
+          
+          // Simple truthiness check
+          if (!condition) {
+            break;
+          }
+          
+          iterations++;
+          ctx.log(`While loop iteration ${iterations}`);
+          
+          // Execute body
+          await ctx.go("body", { iteration: iterations, condition });
+          
+          // Safety check to prevent infinite loops
+          if (iterations >= maxIterations) {
+            ctx.log(`While loop terminated after ${maxIterations} iterations (safety limit)`);
+            break;
+          }
+        }
+        
+        ctx.log(`While loop completed after ${iterations} iterations`);
+        await ctx.go("done", { iterations });
+      },
+      render: (props) => ({
+        label: "WHILE",
+        content: `max: ${props.maxIterations ?? 100}`,
+      }),
+    });
+
+    // For Loop with Range
+    BlockRegistry.register("for_range", {
+      displayName: "For Range",
+      category: "control",
+      inputs: ["start", "end", "step"],
+      outputs: ["body", "done"],
+      defaultProps: { start: 0, end: 10, step: 1 },
+      description: "Loops from start to end with step",
+      execute: async (ctx) => {
+        const start = Number(ctx.inputs.start ?? 0);
+        const end = Number(ctx.inputs.end ?? 10);
+        const step = Number(ctx.inputs.step ?? 1);
+        
+        if (step === 0) {
+          ctx.log("Step cannot be zero");
+          await ctx.go("done", { error: "Invalid step value" });
+          return;
+        }
+        
+        let current = start;
+        let iterations = 0;
+        const maxIterations = 1000; // Safety limit
+        
+        if (step > 0) {
+          while (current < end && iterations < maxIterations) {
+            iterations++;
+            ctx.log(`For loop iteration ${iterations}: i = ${current}`);
+            
+            await ctx.go("body", { index: current, iteration: iterations });
+            current += step;
+          }
+        } else {
+          while (current > end && iterations < maxIterations) {
+            iterations++;
+            ctx.log(`For loop iteration ${iterations}: i = ${current}`);
+            
+            await ctx.go("body", { index: current, iteration: iterations });
+            current += step;
+          }
+        }
+        
+        ctx.log(`For loop completed after ${iterations} iterations`);
+        await ctx.go("done", { iterations, finalValue: current });
+      },
+      render: (props) => ({
+        label: "FOR",
+        content: `${props.start ?? 0}..${props.end ?? 10}`,
+      }),
+    });
+
+    // Conditional Assignment
+    BlockRegistry.register("if_assign", {
+      displayName: "If Assign",
+      category: "control",
+      inputs: ["condition", "trueValue", "falseValue"],
+      outputs: ["result"],
+      defaultProps: {},
+      description: "Assigns different values based on condition",
+      execute: async (ctx) => {
+        const condition = ctx.inputs.condition;
+        const trueValue = ctx.inputs.trueValue;
+        const falseValue = ctx.inputs.falseValue;
+        
+        const result = condition ? trueValue : falseValue;
+        
+        ctx.setValue("result", result);
+        ctx.log(`If assign: condition=${!!condition}, result=${JSON.stringify(result)}`);
+        
+        await ctx.go("result", result);
+      },
+      render: () => ({
+        label: "IF=",
+        content: "condition ? a : b",
+      }),
+    });
+
+    // String Concatenation (useful for building dynamic names)
+    BlockRegistry.register("string_concat", {
+      displayName: "String Concat",
+      category: "data",
+      inputs: ["left", "right"],
+      outputs: ["result"],
+      defaultProps: { separator: "" },
+      description: "Concatenates two strings",
+      execute: async (ctx) => {
+        const left = String(ctx.inputs.left ?? "");
+        const right = String(ctx.inputs.right ?? "");
+        const separator = String(ctx.inputs.separator ?? "");
+        
+        const result = left + separator + right;
+        
+        ctx.setValue("result", result);
+        ctx.log(`Concat: "${left}" + "${separator}" + "${right}" = "${result}"`);
+        
+        await ctx.go("result", result);
+      },
+      render: (props) => ({
+        label: "CONCAT",
+        content: `"${props.separator || ''}"`,
+      }),
+    });
+
+    // Math Assignment Operations
+    BlockRegistry.register("add_assign", {
+      displayName: "Add Assign",
+      category: "math",
+      inputs: ["target", "value"],
+      outputs: ["result"],
+      defaultProps: {},
+      description: "Adds value to target (target += value)",
+      execute: async (ctx) => {
+        const target = Number(ctx.inputs.target ?? 0);
+        const value = Number(ctx.inputs.value ?? 0);
+        const result = target + value;
+        
+        ctx.setValue("result", result);
+        ctx.log(`Add assign: ${target} += ${value} = ${result}`);
+        
+        await ctx.go("result", result);
+      },
+      render: () => ({
+        label: "+=",
+        content: "target += value",
+      }),
+    });
+
+    BlockRegistry.register("multiply_assign", {
+      displayName: "Multiply Assign",
+      category: "math",
+      inputs: ["target", "value"],
+      outputs: ["result"],
+      defaultProps: {},
+      description: "Multiplies target by value (target *= value)",
+      execute: async (ctx) => {
+        const target = Number(ctx.inputs.target ?? 1);
+        const value = Number(ctx.inputs.value ?? 1);
+        const result = target * value;
+        
+        ctx.setValue("result", result);
+        ctx.log(`Multiply assign: ${target} *= ${value} = ${result}`);
+        
+        await ctx.go("result", result);
+      },
+      render: () => ({
+        label: "*=",
+        content: "target *= value",
+      }),
+    });
+
+    console.log("Enhanced blocks registered successfully");
+  } catch (error) {
+    console.error("Failed to register enhanced blocks:", error);
+  }
+}
+
+# Enhanced Visual Programming Framework
+
+A powerful, extensible visual programming framework with advanced assignment operations, inline editing, and comprehensive data manipulation capabilities.
+
+## 🚀 New Features in v2.0
+
+### ✨ Assignment Operations
+- **Set/Get Variables**: Store and retrieve values by name across your program
+- **Array Manipulation**: Push, pop, get/set elements by index
+- **Object Properties**: Get and set object properties dynamically
+- **Math Assignments**: += and *= operators for efficient value updates
+
+### 🎨 Inline Editing
+- **Double-click any element** to edit its properties in place
+- **Context menus** with right-click for duplicate/delete operations
+- **Real-time updates** that instantly reflect in your visual program
+- **Type-aware inputs** (numbers, text, arrays, booleans)
+
+### ⌨️ Enhanced Keyboard Shortcuts
+- **Quick Add**: Alt + key combinations to rapidly add blocks
+- **Enhanced Navigation**: Improved undo/redo and selection
+- **Power User Features**: Duplicate, select all, and more
+
+## 📦 Installation
+
+### Prerequisites
+- Node.js 18+ 
+- npm or yarn
+
+### Quick Start
+
+1. **Clone or create project:**
+```bash
+mkdir enhanced-visual-programming
+cd enhanced-visual-programming
+```
+
+2. **Install dependencies:**
+```bash
+npm install vite typescript lodash-es --save-dev
+```
+
+3. **Copy the framework files** to their respective locations
+4. **Start development server:**
+```bash
+npm run dev
+```
+
+## 🎯 Core Assignment Blocks
+
+### Variable Operations
+- **Set Variable** (`set_variable`): Assigns values to named variables
+- **Get Variable** (`get_variable`): Retrieves variable values by name
+- **Variable** (`variable`): Creates initial variable declarations
+
+### Array Operations
+- **Array Push** (`array_push`): Adds elements to the end of an array
+- **Array Pop** (`array_pop`): Removes and returns the last element
+- **Array Get** (`array_get`): Retrieves element by index
+- **Array Set** (`array_set`): Sets element at specific index
+
+### Object Operations
+- **Object Get** (`object_get`): Gets property values from objects
+- **Object Set** (`object_set`): Sets object properties
+
+### Math Assignment
+- **Add Assign** (`add_assign`): Implements += operation
+- **Multiply Assign** (`multiply_assign`): Implements *= operation
+
+### Enhanced Control Flow
+- **While Loop** (`while_loop`): Loops while condition is true
+- **For Range** (`for_range`): Loops from start to end with step
+- **If Assign** (`if_assign`): Conditional value assignment
+
+## 🎮 Usage Examples
+
+### Example 1: Counter with Variable Storage
+```
+1. Add "Variable" block (name: "count", value: 0)
+2. Add "Set Variable" block (name: "count") 
+3. Add "Get Variable" block (name: "count")
+4. Add "Counter Increment" block
+5. Connect: Variable → Set Variable → Get Variable → Counter Increment
+```
+
+### Example 2: Array Processing
+```
+1. Add "Array" block with items [1, 2, 3]
+2. Add "For Range" loop (start: 0, end: 3, step: 1)
+3. Add "Array Get" block 
+4. Add "Print" block
+5. Connect: Array → Array Get, For Range → Array Get → Print
+```
+
+### Example 3: Object Manipulation
+```
+1. Add "Object" block with properties
+2. Add "Object Get" block (key: "name")
+3. Add "Object Set" block (key: "modified", value: true)
+4. Connect: Object → Object Get → Print
+5. Connect: Object → Object Set → Print
+```
+
+## ⌨️ Keyboard Shortcuts
+
+### File Operations
+- `Ctrl+S`: Save program to file
+- `Ctrl+O`: Load program from file
+- `Ctrl+Enter`: Execute current program
+
+### Editing Operations
+- `Ctrl+Z`: Undo last action
+- `Ctrl+Y` or `Ctrl+Shift+Z`: Redo action
+- `Ctrl+D`: Duplicate selected element
+- `Delete`: Remove selected element
+- `Escape`: Exit connection mode
+
+### Quick Add Blocks (Alt + Key)
+- `Alt+V`: Add Variable
+- `Alt+S`: Add Set Variable  
+- `Alt+G`: Add Get Variable
+- `Alt+A`: Add Array
+- `Alt+F`: Add Function
+- `Alt+L`: Add Loop
+- `Alt+C`: Add Counter
+- `Alt+P`: Add Print
+
+### Interaction
+- **Double-click**: Edit element properties
+- **Right-click**: Show context menu
+- **Drag**: Move elements around canvas
+
+## 🎨 Inline Editing System
+
+### Editing Element Properties
+
+1. **Double-click any element** to open the inline editor
+2. **Modify values** using appropriate input types:
+   - Text fields for strings and names
+   - Number inputs for numeric values  
+   - Textareas for arrays (JSON format)
+   - Checkboxes for boolean values
+3. **Save changes** to update the element immediately
+4. **Cancel** to discard changes
+
+### Context Menu Options
+
+**Right-click any element** to access:
+- **Edit Properties**: Same as double-click
+- **Duplicate**: Create a copy with slight offset
+- **Delete**: Remove element and all connections
+
+### Property Types
+
+The framework automatically detects property types:
+- **String properties**: Text input fields
+- **Number properties**: Number input with validation
+- **Boolean properties**: Checkbox inputs
+- **Array properties**: JSON textarea with syntax validation
+- **Object properties**: JSON textarea for complex data
+
+## 🏗️ Architecture Overview
+
+### Enhanced Block Registry
+
+The registry now supports advanced block definitions with:
+- **Type validation**: Runtime type checking for inputs/outputs
+- **Default properties**: Sensible defaults for all block types
+- **Execution contexts**: Rich context with state management
+- **Render functions**: Dynamic visual representation
+
+### State Management
+
+- **Global State**: Shared variables accessible across blocks
+- **Local State**: Block-specific internal state
+- **Undo/Redo**: Comprehensive action history
+- **Auto-save**: Periodic backup to localStorage
+
+### Type System
+
+```typescript
+interface ExecutionContext {
+  elementId: string;
+  inputs: Record<string, unknown>;
+  state: Map<string, Map<string, unknown>>;
+  
+  // Enhanced methods
+  go(output: string, value?: unknown): Promise<void>;
+  setValue(key: string, value: unknown): void;
+  getValue(key: string): unknown;
+  log(message: string): void;
+}
+```
+
+## 🧪 Programming Patterns
+
+### Pattern 1: Variable Accumulator
+```
+Variable(count=0) → While Loop → Get Variable → Add Assign → Set Variable
+                      ↓              ↓            ↓           ↓
+                   Condition ←── Compare ←──── counter ←──── result
+```
+
+### Pattern 2: Array Processing Pipeline
+```
+Array([1,2,3]) → For Range → Array Get → Transform → Array Push → Result Array
+```
+
+### Pattern 3: Object Builder
+```
+Object({}) → Set Property → Set Property → Set Property → Final Object
+              ↓name          ↓age          ↓active        ↓
+            "John"          25            true          Complete
+```
+
+## 🎛️ Configuration Options
+
+### App Options
+```typescript
+{
+  enableAutoSave: true,          // Auto-save every 30s
+  enableMinimap: true,           // Show program overview
+  enableUndoRedo: true,          // Undo/redo support
+  enableInlineEditing: true,     // Double-click editing
+  enableEnhancedBlocks: true,    // Assignment operations
+  maxUndoSteps: 50,             // Undo history size
+  enableKeyboardShortcuts: true, // Keyboard controls
+}
+```
+
+### Block Registry Options
+```typescript
+{
+  maxElements: 1000,            // Max blocks on canvas
+  maxConnections: 2000,         // Max connections
+  gridSize: 16,                 // Snap-to-grid size
+  enableValidation: true,       // Runtime type checking
+}
+```
+
+## 🔧 Extending the Framework
+
+### Adding Custom Assignment Blocks
+
+```typescript
+import { BlockRegistry } from './core/registry.js';
+
+BlockRegistry.register("custom_assign", {
+  displayName: "Custom Assignment",
+  category: "data",
+  inputs: ["target", "operation", "value"],
+  outputs: ["result"],
+  defaultProps: { operation: "set" },
+  
+  execute: async (ctx) => {
+    const target = ctx.inputs.target;
+    const operation = ctx.inputs.operation;
+    const value = ctx.inputs.value;
+    
+    let result;
+    switch (operation) {
+      case "set": result = value; break;
+      case "add": result = target + value; break;
+      case "multiply": result = target * value; break;
+      default: result = target;
+    }
+    
+    await ctx.go("result", result);
+  },
+  
+  render: (props) => ({
+    label: "ASSIGN",
+    content: `${props.operation || "set"} operation`
+  })
+});
+```
+
+### Custom Property Editors
+
+```typescript
+import { EditableElements } from './editable-elements.js';
+
+// Add custom property types
+const editableElements = new EditableElements(editor, {
+  onPropertyChanged: (elementId, property, value) => {
+    // Custom validation or processing
+    if (property === "customArray") {
+      // Parse custom array format
+      value = parseCustomArrayFormat(value);
+    }
+    
+    // Update element
+    updateElementProperty(elementId, property, value);
+  }
+});
+```
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**Elements not saving changes:**
+- Check that double-click editing is enabled
+- Verify the element type supports the property being edited
+- Check browser console for validation errors
+
+**Variables not accessible between blocks:**
+- Ensure you're using "Set Variable" to store values
+- Variable names must match exactly between Set/Get blocks
+- Check that blocks are connected in the execution flow
+
+**Array operations failing:**
+- Verify input is actually an array type
+- Check array indices are within bounds
+- Use JSON format for complex array values
+
+**Execution not flowing properly:**
+- Verify all blocks are connected correctly
+- Check for cycle detection warnings
+- Use step-by-step execution for debugging
+
+### Debug Mode
+
+Access debug information in browser console:
+```javascript
+// Access global instances
+window.EnhancedApp      // Main application
+window.BlockRegistry    // Block definitions
+
+// Get execution state
+app.getStats()          // App statistics
+registry.getStats()     // Registry information
+```
+
+## 📈 Performance Tips
+
+1. **Limit Array Sizes**: Keep arrays under 1000 elements for optimal performance
+2. **Manage State**: Clean up unused variables to prevent memory leaks
+3. **Connection Optimization**: Minimize unnecessary connections
+4. **Execution Limits**: Use maxSteps and maxExecutionTime for safety
+
+## 🛣️ Roadmap
+
+### v2.1 Planned Features
+- [ ] Multi-selection and bulk operations
+- [ ] Custom property editors for specific block types
+- [ ] Import/export individual block definitions
+- [ ] Template system for common patterns
+- [ ] Advanced debugging with breakpoints
+
+### v2.2 Planned Features  
+- [ ] Collaborative editing support
+- [ ] Plugin system for external blocks
+- [ ] Advanced data types (dates, regex, etc.)
+- [ ] Performance profiling tools
+- [ ] Mobile/touch interface improvements
+
+## 📝 License
+
+MIT License - feel free to use in your projects!
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new functionality  
+4. Submit a pull request with clear description
+
+## 🙏 Acknowledgments
+
+- Original Visual Programming Framework
+- TypeScript community for excellent tooling
+- Vite for fast development experience
+- All contributors and users providing feedback
+
+---
+
+**Happy  Visual Programming! 🚀**
+
+For more information, check out the [documentation](./docs) or [examples](./examples) directories.
